@@ -8,6 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
+
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -23,18 +29,26 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate input
+    const validation = loginSchema.safeParse({ email, password });
+    if (!validation.success) {
+      setError(validation.error.errors[0].message);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result.success) {
         toast({
           title: 'Welcome back!',
           description: 'You have successfully logged in.',
         });
         navigate('/dashboard');
       } else {
-        setError('Invalid email or password. Please try again.');
+        setError(result.error || 'Invalid email or password. Please try again.');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
@@ -158,16 +172,6 @@ export default function Login() {
                 Don't have an account?{' '}
                 <span className="text-primary">Contact your administrator</span>
               </p>
-            </div>
-
-            {/* Demo Accounts Info */}
-            <div className="mt-6 p-4 rounded-lg bg-secondary/50 border border-border">
-              <p className="text-xs text-muted-foreground font-medium mb-2">Demo Accounts:</p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>Admin: admin@learnbox.uz / admin123</p>
-                <p>Teacher: teacher@learnbox.uz / teacher123</p>
-                <p>Student: student@learnbox.uz / student123</p>
-              </div>
             </div>
           </CardContent>
         </Card>

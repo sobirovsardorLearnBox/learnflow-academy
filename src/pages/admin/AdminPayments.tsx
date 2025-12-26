@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, CheckCircle2, XCircle, Clock, MoreVertical, AlertTriangle } from 'lucide-react';
+import { Search, CheckCircle2, XCircle, Clock, MoreVertical, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,30 +12,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-
-interface Payment {
-  id: string;
-  userName: string;
-  userEmail: string;
-  amount: string;
-  date: string;
-  status: 'pending' | 'approved' | 'rejected';
-  method: string;
-}
-
-const mockPayments: Payment[] = [
-  { id: '1', userName: 'John Smith', userEmail: 'john@example.com', amount: '$29.99', date: '2024-01-15', status: 'pending', method: 'Telegram' },
-  { id: '2', userName: 'Sarah Wilson', userEmail: 'sarah@example.com', amount: '$29.99', date: '2024-01-14', status: 'approved', method: 'Telegram' },
-  { id: '3', userName: 'Mike Johnson', userEmail: 'mike@example.com', amount: '$29.99', date: '2024-01-13', status: 'approved', method: 'Telegram' },
-  { id: '4', userName: 'Emily Davis', userEmail: 'emily@example.com', amount: '$29.99', date: '2024-01-12', status: 'rejected', method: 'Telegram' },
-  { id: '5', userName: 'Alex Brown', userEmail: 'alex@example.com', amount: '$29.99', date: '2024-01-11', status: 'pending', method: 'Telegram' },
-];
+import { useAdminPayments, useUpdatePaymentStatus } from '@/hooks/useAdminData';
 
 export default function AdminPayments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
 
-  const filteredPayments = mockPayments.filter((payment) => {
+  const { data: payments, isLoading } = useAdminPayments();
+  const updatePaymentStatus = useUpdatePaymentStatus();
+
+  const filteredPayments = (payments || []).filter((payment) => {
     const matchesSearch =
       payment.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       payment.userEmail.toLowerCase().includes(searchQuery.toLowerCase());
@@ -44,17 +30,35 @@ export default function AdminPayments() {
   });
 
   const stats = [
-    { label: 'Total Payments', value: mockPayments.length, icon: CheckCircle2, color: 'from-primary to-accent' },
-    { label: 'Pending', value: mockPayments.filter((p) => p.status === 'pending').length, icon: Clock, color: 'from-warning to-orange-500' },
-    { label: 'Approved', value: mockPayments.filter((p) => p.status === 'approved').length, icon: CheckCircle2, color: 'from-success to-emerald-400' },
-    { label: 'Rejected', value: mockPayments.filter((p) => p.status === 'rejected').length, icon: XCircle, color: 'from-destructive to-rose-400' },
+    { label: 'Total Payments', value: payments?.length || 0, icon: CheckCircle2, color: 'from-primary to-accent' },
+    { label: 'Pending', value: payments?.filter((p) => p.status === 'pending').length || 0, icon: Clock, color: 'from-warning to-orange-500' },
+    { label: 'Approved', value: payments?.filter((p) => p.status === 'approved').length || 0, icon: CheckCircle2, color: 'from-success to-emerald-400' },
+    { label: 'Blocked', value: payments?.filter((p) => p.status === 'blocked').length || 0, icon: XCircle, color: 'from-destructive to-rose-400' },
   ];
 
   const statusConfig = {
     pending: { icon: Clock, label: 'Pending', color: 'bg-warning/20 text-warning' },
     approved: { icon: CheckCircle2, label: 'Approved', color: 'bg-success/20 text-success' },
-    rejected: { icon: XCircle, label: 'Rejected', color: 'bg-destructive/20 text-destructive' },
+    blocked: { icon: XCircle, label: 'Blocked', color: 'bg-destructive/20 text-destructive' },
   };
+
+  const handleApprove = (paymentId: string) => {
+    updatePaymentStatus.mutate({ paymentId, status: 'approved' });
+  };
+
+  const handleReject = (paymentId: string) => {
+    updatePaymentStatus.mutate({ paymentId, status: 'blocked' });
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -105,7 +109,7 @@ export default function AdminPayments() {
                 />
               </div>
               <div className="flex gap-2">
-                {['all', 'pending', 'approved', 'rejected'].map((status) => (
+                {['all', 'pending', 'approved', 'blocked'].map((status) => (
                   <Button
                     key={status}
                     variant={selectedStatus === status ? 'default' : 'outline'}
@@ -122,75 +126,91 @@ export default function AdminPayments() {
         </Card>
 
         {/* Payments List */}
-        <div className="space-y-3">
-          {filteredPayments.map((payment, index) => {
-            const config = statusConfig[payment.status];
-            return (
-              <motion.div
-                key={payment.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card variant="interactive">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold">
-                          {payment.userName.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-medium">{payment.userName}</p>
-                          <p className="text-sm text-muted-foreground">{payment.userEmail}</p>
-                        </div>
-                      </div>
-
-                      <div className="hidden md:block text-center">
-                        <p className="font-semibold text-lg">{payment.amount}</p>
-                        <p className="text-xs text-muted-foreground">Monthly</p>
-                      </div>
-
-                      <div className="hidden md:block text-center">
-                        <p className="text-sm">{payment.date}</p>
-                        <p className="text-xs text-muted-foreground">{payment.method}</p>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <span className={cn('inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium', config.color)}>
-                          <config.icon className="w-3 h-3" />
-                          {config.label}
-                        </span>
-
-                        {payment.status === 'pending' && (
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="success" className="bg-success hover:bg-success/90 text-success-foreground">
-                              <CheckCircle2 className="w-4 h-4" />
-                            </Button>
-                            <Button size="sm" variant="destructive">
-                              <XCircle className="w-4 h-4" />
-                            </Button>
+        {filteredPayments.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No payments found.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredPayments.map((payment, index) => {
+              const config = statusConfig[payment.status];
+              return (
+                <motion.div
+                  key={payment.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <Card variant="interactive">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold">
+                            {payment.userName.charAt(0)}
                           </div>
-                        )}
+                          <div>
+                            <p className="font-medium">{payment.userName}</p>
+                            <p className="text-sm text-muted-foreground">{payment.userEmail}</p>
+                          </div>
+                        </div>
 
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>Send Reminder</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="hidden md:block text-center">
+                          <p className="font-semibold text-lg">${payment.amount || '29.99'}</p>
+                          <p className="text-xs text-muted-foreground">Monthly</p>
+                        </div>
+
+                        <div className="hidden md:block text-center">
+                          <p className="text-sm">{payment.month} {payment.year}</p>
+                          <p className="text-xs text-muted-foreground">Telegram</p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className={cn('inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium', config.color)}>
+                            <config.icon className="w-3 h-3" />
+                            {config.label}
+                          </span>
+
+                          {payment.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                className="bg-success hover:bg-success/90 text-success-foreground"
+                                onClick={() => handleApprove(payment.id)}
+                                disabled={updatePaymentStatus.isPending}
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => handleReject(payment.id)}
+                                disabled={updatePaymentStatus.isPending}
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          )}
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>View Details</DropdownMenuItem>
+                              <DropdownMenuItem>Send Reminder</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            );
-          })}
-        </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
