@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, MoreVertical, UserPlus, Mail, Shield, Trash2, Loader2 } from 'lucide-react';
+import { Search, MoreVertical, Mail, Shield, Trash2, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useAdminUsers } from '@/hooks/useAdminData';
+import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 
 export default function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,10 +56,7 @@ export default function AdminUsers() {
             <h1 className="text-2xl lg:text-3xl font-bold">User Management</h1>
             <p className="text-muted-foreground mt-1">Manage all platform users</p>
           </div>
-          <Button variant="premium">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Add User
-          </Button>
+          <CreateUserDialog />
         </div>
 
         {/* Stats */}
