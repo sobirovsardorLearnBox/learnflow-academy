@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import Login from "./pages/Login";
+import Setup from "./pages/Setup";
 import Dashboard from "./pages/Dashboard";
 import Payment from "./pages/Payment";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -55,6 +56,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/setup" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Setup />} />
       
       <Route path="/dashboard" element={
         <ProtectedRoute>
