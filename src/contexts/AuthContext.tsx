@@ -88,14 +88,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching payment:', paymentError);
       }
 
+      const role = (roleData?.role as UserRole) || 'student';
+      
+      // Admins and teachers don't need payment - always approved
+      const paymentStatus: PaymentStatus = 
+        role === 'admin' || role === 'teacher' 
+          ? 'approved' 
+          : (paymentData?.status as PaymentStatus) || 'pending';
+
       return {
         id: profile.id,
         user_id: profile.user_id,
         email: profile.email,
         name: profile.name,
         avatar_url: profile.avatar_url,
-        role: (roleData?.role as UserRole) || 'student',
-        paymentStatus: (paymentData?.status as PaymentStatus) || 'pending',
+        role,
+        paymentStatus,
       };
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
