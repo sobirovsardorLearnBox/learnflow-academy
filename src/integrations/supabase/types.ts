@@ -207,6 +207,53 @@ export type Database = {
         }
         Relationships: []
       }
+      quizzes: {
+        Row: {
+          correct_answer: number
+          created_at: string
+          explanation: string | null
+          id: string
+          is_active: boolean
+          lesson_id: string
+          options: Json
+          question: string
+          question_order: number
+          updated_at: string
+        }
+        Insert: {
+          correct_answer: number
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          is_active?: boolean
+          lesson_id: string
+          options?: Json
+          question: string
+          question_order?: number
+          updated_at?: string
+        }
+        Update: {
+          correct_answer?: number
+          created_at?: string
+          explanation?: string | null
+          id?: string
+          is_active?: boolean
+          lesson_id?: string
+          options?: Json
+          question?: string
+          question_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sections: {
         Row: {
           created_at: string

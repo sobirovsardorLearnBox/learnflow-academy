@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit2, Trash2, ChevronRight, GripVertical, BookOpen, Play, Code, Globe, Shield, Cpu, Database } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronRight, GripVertical, BookOpen, Play, Code, Globe, Shield, Cpu, Database, HelpCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ContentDialog } from '@/components/admin/ContentDialog';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
+import { QuizManagerDialog } from '@/components/admin/QuizManagerDialog';
 import {
   useAdminSections,
   useAdminLevels,
@@ -65,6 +66,10 @@ export default function AdminSections() {
   // Delete dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string; name: string } | null>(null);
+
+  // Quiz dialog states
+  const [quizDialogOpen, setQuizDialogOpen] = useState(false);
+  const [quizLessonId, setQuizLessonId] = useState<string | null>(null);
 
   // Data hooks
   const { data: sections, isLoading: sectionsLoading } = useAdminSections();
@@ -169,6 +174,11 @@ export default function AdminSections() {
     } catch (error) {
       // Error handled by mutation
     }
+  };
+
+  const openQuizManager = (lessonId: string) => {
+    setQuizLessonId(lessonId);
+    setQuizDialogOpen(true);
   };
 
   const getParentOptions = () => {
@@ -417,6 +427,15 @@ export default function AdminSections() {
                                                     {!lesson.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
                                                   </div>
                                                   <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                                    <Button 
+                                                      variant="ghost" 
+                                                      size="icon" 
+                                                      className="h-5 w-5" 
+                                                      onClick={() => openQuizManager(lesson.id)}
+                                                      title="Manage Quiz"
+                                                    >
+                                                      <HelpCircle className="w-2.5 h-2.5" />
+                                                    </Button>
                                                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => openEditDialog('lesson', lesson)}>
                                                       <Edit2 className="w-2.5 h-2.5" />
                                                     </Button>
@@ -473,6 +492,13 @@ export default function AdminSections() {
         description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
         onConfirm={handleDelete}
         isLoading={deleteSection.isPending || deleteLevel.isPending || deleteUnit.isPending || deleteLesson.isPending}
+      />
+
+      {/* Quiz Manager */}
+      <QuizManagerDialog
+        open={quizDialogOpen}
+        onOpenChange={setQuizDialogOpen}
+        lessonId={quizLessonId}
       />
     </DashboardLayout>
   );
