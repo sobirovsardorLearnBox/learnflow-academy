@@ -11,48 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLessons, useLesson, useMarkLessonComplete } from '@/hooks/useLessons';
+import { useLessons, useLesson, useQuizzes, useMarkLessonComplete } from '@/hooks/useLessons';
 import { toast } from 'sonner';
-
-// Sample quiz data - in production this would come from the database
-const sampleQuizQuestions = [
-  {
-    id: '1',
-    question: 'What is the main purpose of this lesson?',
-    options: [
-      'To introduce basic concepts',
-      'To provide advanced techniques',
-      'To review previous material',
-      'To prepare for exams'
-    ],
-    correctAnswer: 0,
-    explanation: 'This lesson focuses on introducing the fundamental concepts that will be built upon in later lessons.'
-  },
-  {
-    id: '2',
-    question: 'Which approach is recommended for beginners?',
-    options: [
-      'Jump straight to advanced topics',
-      'Skip the fundamentals',
-      'Start with basics and progress gradually',
-      'Focus only on practice'
-    ],
-    correctAnswer: 2,
-    explanation: 'A gradual approach starting with basics ensures a solid foundation for more complex topics.'
-  },
-  {
-    id: '3',
-    question: 'What should you do after completing a lesson?',
-    options: [
-      'Immediately move to the next one',
-      'Review and practice what you learned',
-      'Skip the exercises',
-      'None of the above'
-    ],
-    correctAnswer: 1,
-    explanation: 'Reviewing and practicing reinforces learning and helps retain information better.'
-  }
-];
 
 export default function Lesson() {
   const { unitId } = useParams();
@@ -63,6 +23,7 @@ export default function Lesson() {
   
   const { data: lessons, isLoading: lessonsLoading } = useLessons(unitId);
   const { data: currentLesson, isLoading: lessonLoading } = useLesson(lessonId || undefined);
+  const { data: quizQuestions, isLoading: quizLoading } = useQuizzes(lessonId || undefined);
   const markComplete = useMarkLessonComplete();
   
   const [activeTab, setActiveTab] = useState('content');
@@ -289,10 +250,23 @@ export default function Lesson() {
                 </TabsContent>
 
                 <TabsContent value="quiz" className="mt-6">
-                  <QuizComponent
-                    questions={sampleQuizQuestions}
-                    onComplete={handleQuizComplete}
-                  />
+                  {quizLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    </div>
+                  ) : quizQuestions && quizQuestions.length > 0 ? (
+                    <QuizComponent
+                      questions={quizQuestions}
+                      onComplete={handleQuizComplete}
+                    />
+                  ) : (
+                    <Card variant="glass">
+                      <CardContent className="flex flex-col items-center justify-center py-16">
+                        <HelpCircle className="w-16 h-16 text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">No quiz available for this lesson yet</p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </TabsContent>
               </Tabs>
 
