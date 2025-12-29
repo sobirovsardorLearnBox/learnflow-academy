@@ -227,7 +227,7 @@ export default function Dashboard() {
                 key={unit.id}
                 unit={unit}
                 index={index}
-                onClick={() => {}}
+                onClick={() => navigate(`/lesson/${unit.id}`)}
               />
             ))}
           </div>
