@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, BookOpen, Video, FileText, HelpCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLessons, useLesson, useQuizzes, useMarkLessonComplete } from '@/hooks/useLessons';
+import { useLessons, useLesson, useQuizzes, useMarkLessonComplete, useMarkUnitComplete, useLessonProgress } from '@/hooks/useLessons';
 import { toast } from 'sonner';
 
 export default function Lesson() {
@@ -24,10 +24,20 @@ export default function Lesson() {
   const { data: lessons, isLoading: lessonsLoading } = useLessons(unitId);
   const { data: currentLesson, isLoading: lessonLoading } = useLesson(lessonId || undefined);
   const { data: quizQuestions, isLoading: quizLoading } = useQuizzes(lessonId || undefined);
-  const markComplete = useMarkLessonComplete();
+  const { data: lessonProgress } = useLessonProgress(user?.id);
+  const markLessonComplete = useMarkLessonComplete();
+  const markUnitComplete = useMarkUnitComplete();
   
   const [activeTab, setActiveTab] = useState('content');
-  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
+
+  // Get completed lessons from database
+  const completedLessons = useMemo(() => {
+    if (!lessonProgress || !lessons) return [];
+    const lessonIds = lessons.map(l => l.id);
+    return lessonProgress
+      .filter(p => lessonIds.includes(p.lesson_id))
+      .map(p => p.lesson_id);
+  }, [lessonProgress, lessons]);
 
   // Set first lesson if none selected
   useEffect(() => {
@@ -41,26 +51,34 @@ export default function Lesson() {
     setActiveTab('content');
   };
 
-  const handleVideoComplete = () => {
-    if (currentLesson && !completedLessons.includes(currentLesson.id)) {
-      setCompletedLessons(prev => [...prev, currentLesson.id]);
-      toast.success('Video completed!');
+  const handleVideoComplete = async () => {
+    if (currentLesson && user?.id && !completedLessons.includes(currentLesson.id)) {
+      try {
+        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.id });
+        toast.success('Lesson completed!');
+      } catch {
+        toast.error('Failed to save progress');
+      }
     }
   };
 
-  const handleQuizComplete = (score: number, total: number) => {
-    if (currentLesson) {
-      setCompletedLessons(prev => 
-        prev.includes(currentLesson.id) ? prev : [...prev, currentLesson.id]
-      );
+  const handleQuizComplete = async (score: number, total: number) => {
+    if (currentLesson && user?.id && !completedLessons.includes(currentLesson.id)) {
+      try {
+        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.id });
+        toast.success(`Quiz completed! Score: ${score}/${total}`);
+      } catch {
+        toast.error('Failed to save progress');
+      }
+    } else {
       toast.success(`Quiz completed! Score: ${score}/${total}`);
     }
   };
 
-  const handleMarkComplete = async () => {
+  const handleMarkUnitComplete = async () => {
     if (!unitId || !user?.id) return;
     try {
-      await markComplete.mutateAsync({ unitId, userId: user.id });
+      await markUnitComplete.mutateAsync({ unitId, userId: user.id });
       toast.success('Unit marked as complete!');
     } catch {
       toast.error('Failed to mark as complete');
@@ -149,12 +167,12 @@ export default function Lesson() {
                     style={{ width: `${(completedLessons.length / lessons.length) * 100}%` }}
                   />
                 </div>
-                {completedLessons.length === lessons.length && (
+                {completedLessons.length === lessons.length && lessons.length > 0 && (
                   <Button 
                     className="w-full mt-4" 
                     size="sm"
-                    onClick={handleMarkComplete}
-                    disabled={markComplete.isPending}
+                    onClick={handleMarkUnitComplete}
+                    disabled={markUnitComplete.isPending}
                   >
                     <CheckCircle2 className="w-4 h-4 mr-2" />
                     Mark Unit Complete

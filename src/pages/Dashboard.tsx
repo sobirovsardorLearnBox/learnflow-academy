@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, TrendingUp, Users, BookOpen, CreditCard, Code, Shield, Languages, Loader2 } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, BookOpen, CreditCard, Code, Shield, Languages, Loader2, Trophy } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SectionCard } from '@/components/dashboard/SectionCard';
 import { LevelCard } from '@/components/dashboard/LevelCard';
@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSections, useLevels, useUnits, Section, Level } from '@/hooks/useSections';
+import { useUserStats, useUnitProgress } from '@/hooks/useLessons';
 
 const iconMap: Record<string, any> = {
   Code,
@@ -31,6 +32,10 @@ export default function Dashboard() {
   const { data: sections, isLoading: sectionsLoading } = useSections();
   const { data: levels, isLoading: levelsLoading } = useLevels(selectedSection?.id);
   const { data: units, isLoading: unitsLoading } = useUnits(selectedLevel?.id);
+  const { data: userStats } = useUserStats(user?.id);
+  
+  const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
+  const { data: unitProgress } = useUnitProgress(unitIds, user?.id);
 
   if (!user) {
     navigate('/');
@@ -61,8 +66,8 @@ export default function Dashboard() {
 
   const stats = [
     { label: 'Courses in Progress', value: sections?.length || 0, icon: BookOpen, color: 'from-cyan-500 to-blue-600' },
-    { label: 'Completed Lessons', value: '0', icon: TrendingUp, color: 'from-emerald-500 to-teal-600' },
-    { label: 'Study Hours', value: '0', icon: Users, color: 'from-violet-500 to-purple-600' },
+    { label: 'Completed Lessons', value: userStats?.completedLessons || 0, icon: TrendingUp, color: 'from-emerald-500 to-teal-600' },
+    { label: 'Completed Units', value: userStats?.completedUnits || 0, icon: Trophy, color: 'from-violet-500 to-purple-600' },
     { label: 'Achievements', value: '0', icon: CreditCard, color: 'from-rose-500 to-pink-600' },
   ];
 
@@ -86,16 +91,22 @@ export default function Dashboard() {
     unitsCount: 12,
   }));
 
-  const transformedUnits = (units || []).map(unit => ({
-    id: unit.id,
-    levelId: unit.level_id,
-    number: unit.unit_number,
-    title: unit.name,
-    isCompleted: false,
-    isLocked: false,
-    subUnits: ['1.1', '1.2', '1.3'],
-    progress: 0,
-  }));
+  const transformedUnits = (units || []).map(unit => {
+    const progress = unitProgress?.[unit.id];
+    const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
+    const isCompleted = progress ? progress.completed === progress.total && progress.total > 0 : false;
+    
+    return {
+      id: unit.id,
+      levelId: unit.level_id,
+      number: unit.unit_number,
+      title: unit.name,
+      isCompleted,
+      isLocked: false,
+      subUnits: progress ? [`${progress.completed}/${progress.total} lessons`] : ['No lessons'],
+      progress: progressPercent,
+    };
+  });
 
   return (
     <DashboardLayout>
