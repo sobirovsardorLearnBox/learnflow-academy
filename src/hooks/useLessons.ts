@@ -4,6 +4,7 @@ import type { Tables } from '@/integrations/supabase/types';
 
 export type Lesson = Tables<'lessons'>;
 export type Quiz = Tables<'quizzes'>;
+export type LessonProgress = Tables<'lesson_progress'>;
 
 export interface QuizQuestion {
   id: string;
@@ -47,6 +48,95 @@ export const useLesson = (lessonId?: string) => {
       return data as Lesson | null;
     },
     enabled: !!lessonId,
+  });
+};
+
+export const useLessonProgress = (userId?: string) => {
+  return useQuery({
+    queryKey: ['lesson_progress', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from('lesson_progress')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('completed', true);
+      
+      if (error) throw error;
+      return data as LessonProgress[];
+    },
+    enabled: !!userId,
+  });
+};
+
+export const useUserStats = (userId?: string) => {
+  return useQuery({
+    queryKey: ['user_stats', userId],
+    queryFn: async () => {
+      if (!userId) return { completedLessons: 0, completedUnits: 0 };
+      
+      const [lessonsResult, unitsResult] = await Promise.all([
+        supabase
+          .from('lesson_progress')
+          .select('id', { count: 'exact' })
+          .eq('user_id', userId)
+          .eq('completed', true),
+        supabase
+          .from('user_progress')
+          .select('id', { count: 'exact' })
+          .eq('user_id', userId)
+          .eq('completed', true),
+      ]);
+      
+      return {
+        completedLessons: lessonsResult.count || 0,
+        completedUnits: unitsResult.count || 0,
+      };
+    },
+    enabled: !!userId,
+  });
+};
+
+export const useUnitProgress = (unitIds: string[], userId?: string) => {
+  return useQuery({
+    queryKey: ['unit_progress', unitIds, userId],
+    queryFn: async () => {
+      if (!userId || unitIds.length === 0) return {};
+      
+      // Get all lessons for these units
+      const { data: lessons } = await supabase
+        .from('lessons')
+        .select('id, unit_id')
+        .in('unit_id', unitIds)
+        .eq('is_active', true);
+      
+      if (!lessons) return {};
+      
+      // Get completed lessons for this user
+      const { data: progress } = await supabase
+        .from('lesson_progress')
+        .select('lesson_id')
+        .eq('user_id', userId)
+        .eq('completed', true);
+      
+      const completedLessonIds = new Set(progress?.map(p => p.lesson_id) || []);
+      
+      // Calculate progress per unit
+      const unitProgress: Record<string, { completed: number; total: number }> = {};
+      
+      for (const lesson of lessons) {
+        if (!unitProgress[lesson.unit_id]) {
+          unitProgress[lesson.unit_id] = { completed: 0, total: 0 };
+        }
+        unitProgress[lesson.unit_id].total++;
+        if (completedLessonIds.has(lesson.id)) {
+          unitProgress[lesson.unit_id].completed++;
+        }
+      }
+      
+      return unitProgress;
+    },
+    enabled: !!userId && unitIds.length > 0,
   });
 };
 
@@ -153,15 +243,53 @@ export const useMarkLessonComplete = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
+    mutationFn: async ({ lessonId, userId }: { lessonId: string; userId: string }) => {
+      const { data: existing } = await supabase
+        .from('lesson_progress')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (existing) {
+        if (!existing.completed) {
+          const { error } = await supabase
+            .from('lesson_progress')
+            .update({ completed: true, completed_at: new Date().toISOString() })
+            .eq('id', existing.id);
+          if (error) throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from('lesson_progress')
+          .insert({ 
+            lesson_id: lessonId, 
+            user_id: userId, 
+            completed: true, 
+            completed_at: new Date().toISOString() 
+          });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lesson_progress'] });
+      queryClient.invalidateQueries({ queryKey: ['user_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['unit_progress'] });
+    },
+  });
+};
+
+export const useMarkUnitComplete = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
     mutationFn: async ({ unitId, userId }: { unitId: string; userId: string }) => {
-      const { data: existing, error: checkError } = await supabase
+      const { data: existing } = await supabase
         .from('user_progress')
         .select('*')
         .eq('unit_id', unitId)
         .eq('user_id', userId)
         .maybeSingle();
-      
-      if (checkError) throw checkError;
       
       if (existing) {
         const { error } = await supabase
@@ -172,12 +300,18 @@ export const useMarkLessonComplete = () => {
       } else {
         const { error } = await supabase
           .from('user_progress')
-          .insert({ unit_id: unitId, user_id: userId, completed: true, completed_at: new Date().toISOString() });
+          .insert({ 
+            unit_id: unitId, 
+            user_id: userId, 
+            completed: true, 
+            completed_at: new Date().toISOString() 
+          });
         if (error) throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user_progress'] });
+      queryClient.invalidateQueries({ queryKey: ['user_stats'] });
     },
   });
 };
