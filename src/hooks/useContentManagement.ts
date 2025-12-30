@@ -114,6 +114,30 @@ export function useUpdateSection() {
   });
 }
 
+export function useReorderSections() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (sections: { id: string; display_order: number }[]) => {
+      const promises = sections.map(({ id, display_order }) =>
+        supabase.from('sections').update({ display_order }).eq('id', id)
+      );
+      const results = await Promise.all(promises);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-sections'] });
+      queryClient.invalidateQueries({ queryKey: ['sections'] });
+      toast({ title: 'Sections reordered' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error reordering sections', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 export function useDeleteSection() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -233,6 +257,30 @@ export function useDeleteLevel() {
   });
 }
 
+export function useReorderLevels() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (levels: { id: string; level_number: number }[]) => {
+      const promises = levels.map(({ id, level_number }) =>
+        supabase.from('levels').update({ level_number }).eq('id', id)
+      );
+      const results = await Promise.all(promises);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-levels'] });
+      queryClient.invalidateQueries({ queryKey: ['levels'] });
+      toast({ title: 'Levels reordered' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error reordering levels', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 // Units hooks
 export function useAdminUnits(levelId?: string) {
   return useQuery({
@@ -329,6 +377,30 @@ export function useDeleteUnit() {
   });
 }
 
+export function useReorderUnits() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (units: { id: string; unit_number: number }[]) => {
+      const promises = units.map(({ id, unit_number }) =>
+        supabase.from('units').update({ unit_number }).eq('id', id)
+      );
+      const results = await Promise.all(promises);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-units'] });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
+      toast({ title: 'Units reordered' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error reordering units', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
 // Lessons hooks
 export function useAdminLessons(unitId?: string) {
   return useQuery({
@@ -421,6 +493,30 @@ export function useDeleteLesson() {
     },
     onError: (error: Error) => {
       toast({ title: 'Error deleting lesson', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useReorderLessons() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (lessons: { id: string; lesson_number: number }[]) => {
+      const promises = lessons.map(({ id, lesson_number }) =>
+        supabase.from('lessons').update({ lesson_number }).eq('id', id)
+      );
+      const results = await Promise.all(promises);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-lessons'] });
+      queryClient.invalidateQueries({ queryKey: ['lessons'] });
+      toast({ title: 'Lessons reordered' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error reordering lessons', description: error.message, variant: 'destructive' });
     },
   });
 }
