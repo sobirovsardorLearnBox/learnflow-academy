@@ -14,6 +14,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminSections from "./pages/admin/AdminSections";
 import AdminDevices from "./pages/admin/AdminDevices";
+import AdminProgress from "./pages/admin/AdminProgress";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -105,6 +106,12 @@ function AppRoutes() {
       <Route path="/admin/devices" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminDevices />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/progress" element={
+        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+          <AdminProgress />
         </ProtectedRoute>
       } />
 
