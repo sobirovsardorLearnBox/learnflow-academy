@@ -16,14 +16,34 @@ import {
 import { useStudentProgress, StudentProgress } from '@/hooks/useStudentProgress';
 import { format } from 'date-fns';
 
+type ProgressRange = 'all' | '0-25' | '25-50' | '50-75' | '75-100';
+
+const progressRanges: { value: ProgressRange; label: string; min: number; max: number }[] = [
+  { value: 'all', label: 'All', min: 0, max: 100 },
+  { value: '0-25', label: '0-25%', min: 0, max: 25 },
+  { value: '25-50', label: '25-50%', min: 25, max: 50 },
+  { value: '50-75', label: '50-75%', min: 50, max: 75 },
+  { value: '75-100', label: '75-100%', min: 75, max: 100 },
+];
+
 export default function AdminProgress() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [progressFilter, setProgressFilter] = useState<ProgressRange>('all');
   const { data: students, isLoading } = useStudentProgress();
 
-  const filteredStudents = students?.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    student.email.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredStudents = students?.filter(student => {
+    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    if (progressFilter === 'all') return true;
+    
+    const range = progressRanges.find(r => r.value === progressFilter);
+    if (!range) return true;
+    
+    return student.progressPercentage >= range.min && student.progressPercentage <= range.max;
+  }) || [];
 
   // Calculate aggregate stats
   const totalStudents = students?.length || 0;
@@ -133,15 +153,29 @@ export default function AdminProgress() {
           </Card>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search students..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search students..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {progressRanges.map((range) => (
+              <Button
+                key={range.value}
+                variant={progressFilter === range.value ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setProgressFilter(range.value)}
+              >
+                {range.label}
+              </Button>
+            ))}
+          </div>
         </div>
 
         {/* Progress Table */}
