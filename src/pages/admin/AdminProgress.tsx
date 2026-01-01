@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Search, TrendingUp, Users, BookOpen, Trophy, Download } from 'lucide-react';
+import { Loader2, Search, TrendingUp, Users, BookOpen, Trophy, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,8 @@ import { useStudentProgress, StudentProgress } from '@/hooks/useStudentProgress'
 import { format } from 'date-fns';
 
 type ProgressRange = 'all' | '0-25' | '25-50' | '50-75' | '75-100';
+type SortColumn = 'name' | 'progress' | 'lastActivity';
+type SortDirection = 'asc' | 'desc';
 
 const progressRanges: { value: ProgressRange; label: string; min: number; max: number }[] = [
   { value: 'all', label: 'All', min: 0, max: 100 },
@@ -29,7 +31,25 @@ const progressRanges: { value: ProgressRange; label: string; min: number; max: n
 export default function AdminProgress() {
   const [searchQuery, setSearchQuery] = useState('');
   const [progressFilter, setProgressFilter] = useState<ProgressRange>('all');
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const { data: students, isLoading } = useStudentProgress();
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column) return <ArrowUpDown className="w-4 h-4 ml-1" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1" /> 
+      : <ArrowDown className="w-4 h-4 ml-1" />;
+  };
 
   const filteredStudents = students?.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -44,6 +64,23 @@ export default function AdminProgress() {
     
     return student.progressPercentage >= range.min && student.progressPercentage <= range.max;
   }) || [];
+
+  const sortedStudents = [...filteredStudents].sort((a, b) => {
+    const multiplier = sortDirection === 'asc' ? 1 : -1;
+    
+    switch (sortColumn) {
+      case 'name':
+        return multiplier * a.name.localeCompare(b.name);
+      case 'progress':
+        return multiplier * (a.progressPercentage - b.progressPercentage);
+      case 'lastActivity':
+        const dateA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+        const dateB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+        return multiplier * (dateA - dateB);
+      default:
+        return 0;
+    }
+  });
 
   // Calculate aggregate stats
   const totalStudents = students?.length || 0;
@@ -60,10 +97,10 @@ export default function AdminProgress() {
   }).length || 0;
 
   const exportToCSV = () => {
-    if (!filteredStudents.length) return;
+    if (!sortedStudents.length) return;
 
     const headers = ['Name', 'Email', 'Completed Lessons', 'Total Lessons', 'Completed Units', 'Total Units', 'Progress %', 'Last Activity'];
-    const rows = filteredStudents.map(s => [
+    const rows = sortedStudents.map(s => [
       s.name,
       s.email,
       s.completedLessons,
@@ -104,7 +141,7 @@ export default function AdminProgress() {
             <h1 className="text-3xl font-bold">Student Progress</h1>
             <p className="text-muted-foreground">Track student completion status across all courses</p>
           </div>
-          <Button onClick={exportToCSV} disabled={!filteredStudents.length}>
+          <Button onClick={exportToCSV} disabled={!sortedStudents.length}>
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
@@ -184,22 +221,46 @@ export default function AdminProgress() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Student</TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center">
+                      Student
+                      {getSortIcon('name')}
+                    </div>
+                  </TableHead>
                   <TableHead>Lessons</TableHead>
                   <TableHead>Units</TableHead>
-                  <TableHead className="w-[200px]">Progress</TableHead>
-                  <TableHead>Last Activity</TableHead>
+                  <TableHead 
+                    className="w-[200px] cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('progress')}
+                  >
+                    <div className="flex items-center">
+                      Progress
+                      {getSortIcon('progress')}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('lastActivity')}
+                  >
+                    <div className="flex items-center">
+                      Last Activity
+                      {getSortIcon('lastActivity')}
+                    </div>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredStudents.length === 0 ? (
+                {sortedStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No students found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredStudents.map((student) => (
+                  sortedStudents.map((student) => (
                     <TableRow key={student.userId}>
                       <TableCell>
                         <div className="flex items-center gap-3">
