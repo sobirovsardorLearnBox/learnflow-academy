@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Loader2, Search, TrendingUp, Users, BookOpen, Trophy } from 'lucide-react';
+import { Loader2, Search, TrendingUp, Users, BookOpen, Trophy, Download } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -12,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useStudentProgress } from '@/hooks/useStudentProgress';
+import { useStudentProgress, StudentProgress } from '@/hooks/useStudentProgress';
 import { format } from 'date-fns';
 
 export default function AdminProgress() {
@@ -38,6 +39,32 @@ export default function AdminProgress() {
     return lastDate > weekAgo;
   }).length || 0;
 
+  const exportToCSV = () => {
+    if (!filteredStudents.length) return;
+
+    const headers = ['Name', 'Email', 'Completed Lessons', 'Total Lessons', 'Completed Units', 'Total Units', 'Progress %', 'Last Activity'];
+    const rows = filteredStudents.map(s => [
+      s.name,
+      s.email,
+      s.completedLessons,
+      s.totalLessons,
+      s.completedUnits,
+      s.totalUnits,
+      s.progressPercentage,
+      s.lastActivity ? format(new Date(s.lastActivity), 'yyyy-MM-dd') : 'Never'
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `student-progress-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -52,9 +79,15 @@ export default function AdminProgress() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Student Progress</h1>
-          <p className="text-muted-foreground">Track student completion status across all courses</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Student Progress</h1>
+            <p className="text-muted-foreground">Track student completion status across all courses</p>
+          </div>
+          <Button onClick={exportToCSV} disabled={!filteredStudents.length}>
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
         </div>
 
         {/* Stats Cards */}
