@@ -424,6 +424,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_quiz_answer: {
+        Args: { p_quiz_id: string; p_selected_answer: number }
+        Returns: Json
+      }
+      get_quiz_questions: {
+        Args: { p_lesson_id: string }
+        Returns: {
+          correct_answer: number
+          created_at: string
+          explanation: string
+          id: string
+          is_active: boolean
+          lesson_id: string
+          options: Json
+          question: string
+          question_order: number
+          updated_at: string
+        }[]
+      }
       get_user_payment_status: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["payment_status"]

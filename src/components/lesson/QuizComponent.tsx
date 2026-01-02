@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronRight, RotateCcw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { useCheckQuizAnswer } from '@/hooks/useLessons';
 
 interface QuizQuestion {
   id: string;
@@ -25,6 +26,11 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [lastAnswerCorrect, setLastAnswerCorrect] = useState(false);
+  const [revealedCorrectAnswer, setRevealedCorrectAnswer] = useState<number | null>(null);
+  const [revealedExplanation, setRevealedExplanation] = useState<string | null>(null);
+  
+  const checkAnswer = useCheckQuizAnswer();
 
   const currentQuestion = questions[currentIndex];
   const progress = ((currentIndex + (isAnswered ? 1 : 0)) / questions.length) * 100;
@@ -34,11 +40,41 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
     setSelectedAnswer(index);
   };
 
-  const handleSubmitAnswer = () => {
+  const handleSubmitAnswer = async () => {
     if (selectedAnswer === null) return;
-    setIsAnswered(true);
-    if (selectedAnswer === currentQuestion.correctAnswer) {
-      setScore(prev => prev + 1);
+    
+    // Check if we have the correct answer client-side (admin/teacher)
+    // or need to validate server-side (student - correctAnswer is -1)
+    const hasClientSideAnswer = currentQuestion.correctAnswer !== -1;
+    
+    if (hasClientSideAnswer) {
+      // Admin/teacher mode - use client-side validation
+      setIsAnswered(true);
+      const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+      setLastAnswerCorrect(isCorrect);
+      setRevealedCorrectAnswer(currentQuestion.correctAnswer);
+      setRevealedExplanation(currentQuestion.explanation || null);
+      if (isCorrect) {
+        setScore(prev => prev + 1);
+      }
+    } else {
+      // Student mode - validate server-side
+      try {
+        const result = await checkAnswer.mutateAsync({
+          quizId: currentQuestion.id,
+          selectedAnswer,
+        });
+        
+        setIsAnswered(true);
+        setLastAnswerCorrect(result.is_correct);
+        setRevealedCorrectAnswer(result.correct_answer);
+        setRevealedExplanation(result.explanation);
+        if (result.is_correct) {
+          setScore(prev => prev + 1);
+        }
+      } catch (error) {
+        console.error('Failed to validate answer:', error);
+      }
     }
   };
 
@@ -47,9 +83,12 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
       setCurrentIndex(prev => prev + 1);
       setSelectedAnswer(null);
       setIsAnswered(false);
+      setLastAnswerCorrect(false);
+      setRevealedCorrectAnswer(null);
+      setRevealedExplanation(null);
     } else {
       setIsCompleted(true);
-      onComplete?.(score + (selectedAnswer === currentQuestion.correctAnswer ? 1 : 0), questions.length);
+      onComplete?.(score + (lastAnswerCorrect ? 1 : 0), questions.length);
     }
   };
 
@@ -59,6 +98,9 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
     setIsAnswered(false);
     setScore(0);
     setIsCompleted(false);
+    setLastAnswerCorrect(false);
+    setRevealedCorrectAnswer(null);
+    setRevealedExplanation(null);
   };
 
   if (isCompleted) {
@@ -111,6 +153,9 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
     );
   }
 
+  // Use revealed correct answer if available (from server), otherwise use client-side
+  const correctAnswerIndex = revealedCorrectAnswer ?? currentQuestion.correctAnswer;
+
   return (
     <div className="space-y-6">
       {/* Progress */}
@@ -143,7 +188,7 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
             <CardContent className="space-y-3">
               {currentQuestion.options.map((option, index) => {
                 const isSelected = selectedAnswer === index;
-                const isCorrect = index === currentQuestion.correctAnswer;
+                const isCorrect = index === correctAnswerIndex;
                 const showResult = isAnswered;
 
                 return (
@@ -189,15 +234,15 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
                 );
               })}
 
-              {/* Explanation */}
-              {isAnswered && currentQuestion.explanation && (
+              {/* Explanation - use revealed or client-side explanation */}
+              {isAnswered && (revealedExplanation || currentQuestion.explanation) && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   className="mt-4 p-4 rounded-lg bg-secondary/50 border border-border"
                 >
                   <p className="text-sm text-muted-foreground">
-                    <strong>Explanation:</strong> {currentQuestion.explanation}
+                    <strong>Explanation:</strong> {revealedExplanation || currentQuestion.explanation}
                   </p>
                 </motion.div>
               )}
@@ -209,8 +254,18 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
       {/* Actions */}
       <div className="flex justify-end gap-3">
         {!isAnswered ? (
-          <Button onClick={handleSubmitAnswer} disabled={selectedAnswer === null}>
-            Check Answer
+          <Button 
+            onClick={handleSubmitAnswer} 
+            disabled={selectedAnswer === null || checkAnswer.isPending}
+          >
+            {checkAnswer.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Checking...
+              </>
+            ) : (
+              'Check Answer'
+            )}
           </Button>
         ) : (
           <Button onClick={handleNextQuestion}>
