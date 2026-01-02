@@ -145,25 +145,35 @@ export const useQuizzes = (lessonId?: string) => {
     queryKey: ['quizzes', lessonId],
     queryFn: async () => {
       if (!lessonId) return [];
+      // Use the secure RPC function that hides correct answers from students
       const { data, error } = await supabase
-        .from('quizzes')
-        .select('*')
-        .eq('lesson_id', lessonId)
-        .eq('is_active', true)
-        .order('question_order', { ascending: true });
+        .rpc('get_quiz_questions', { p_lesson_id: lessonId });
       
       if (error) throw error;
       
       // Transform to QuizQuestion format
-      return (data || []).map(q => ({
+      return (data || []).map((q) => ({
         id: q.id,
         question: q.question,
-        options: (q.options as string[]) || [],
+        options: (q.options as unknown as string[]) || [],
         correctAnswer: q.correct_answer,
         explanation: q.explanation || undefined,
       })) as QuizQuestion[];
     },
     enabled: !!lessonId,
+  });
+};
+
+// Hook to check a quiz answer server-side
+export const useCheckQuizAnswer = () => {
+  return useMutation({
+    mutationFn: async ({ quizId, selectedAnswer }: { quizId: string; selectedAnswer: number }) => {
+      const { data, error } = await supabase
+        .rpc('check_quiz_answer', { p_quiz_id: quizId, p_selected_answer: selectedAnswer });
+      
+      if (error) throw error;
+      return data as { is_correct: boolean; correct_answer: number; explanation: string | null };
+    },
   });
 };
 
