@@ -17,6 +17,8 @@ import AdminSections from "./pages/admin/AdminSections";
 import AdminDevices from "./pages/admin/AdminDevices";
 import AdminProgress from "./pages/admin/AdminProgress";
 import AdminSettings from "./pages/admin/AdminSettings";
+import TeacherGroups from "./pages/teacher/TeacherGroups";
+import TeacherLessons from "./pages/teacher/TeacherLessons";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -132,13 +134,13 @@ function AppRoutes() {
       {/* Teacher Routes */}
       <Route path="/groups" element={
         <ProtectedRoute allowedRoles={['teacher']}>
-          <Dashboard />
+          <TeacherGroups />
         </ProtectedRoute>
       } />
 
       <Route path="/lessons" element={
         <ProtectedRoute allowedRoles={['teacher']}>
-          <Dashboard />
+          <TeacherLessons />
         </ProtectedRoute>
       } />
 
