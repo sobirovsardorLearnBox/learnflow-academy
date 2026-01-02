@@ -1,21 +1,18 @@
 import { motion } from 'framer-motion';
-import { CreditCard, MessageSquare, ExternalLink } from 'lucide-react';
+import { CreditCard, MessageSquare, ExternalLink, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { PaymentStatusBadge } from '@/components/dashboard/PaymentBanner';
+import { useUserPayments } from '@/hooks/usePayments';
+import { format } from 'date-fns';
 
 export default function Payment() {
   const { user } = useAuth();
+  const { data: payments, isLoading } = useUserPayments(user?.user_id);
 
   if (!user) return null;
-
-  const paymentHistory = [
-    { id: '1', date: '2024-01-15', amount: '$29.99', status: 'approved' as const },
-    { id: '2', date: '2023-12-15', amount: '$29.99', status: 'approved' as const },
-    { id: '3', date: '2023-11-15', amount: '$29.99', status: 'approved' as const },
-  ];
 
   return (
     <DashboardLayout>
@@ -40,10 +37,10 @@ export default function Payment() {
                 <p className="text-2xl font-bold">$29.99<span className="text-sm font-normal text-muted-foreground">/month</span></p>
                 <p className="text-sm text-muted-foreground mt-1">Full access to all courses</p>
               </div>
-              {user.paymentStatus === 'approved' && (
+              {user.paymentStatus === 'approved' && payments && payments.length > 0 && (
                 <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Next billing date</p>
-                  <p className="font-medium">February 15, 2024</p>
+                  <p className="text-sm text-muted-foreground">Last payment</p>
+                  <p className="font-medium">{payments[0].month} {payments[0].year}</p>
                 </div>
               )}
             </div>
@@ -105,31 +102,50 @@ export default function Payment() {
             <CardTitle>Payment History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {paymentHistory.map((payment, index) => (
-                <motion.div
-                  key={payment.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-success" />
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : !payments || payments.length === 0 ? (
+              <div className="text-center py-8">
+                <CreditCard className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">No payment history yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {payments.map((payment, index) => (
+                  <motion.div
+                    key={payment.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 border border-border"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                        payment.status === 'approved' ? 'bg-success/20' : 
+                        payment.status === 'pending' ? 'bg-warning/20' : 'bg-destructive/20'
+                      }`}>
+                        <CreditCard className={`w-5 h-5 ${
+                          payment.status === 'approved' ? 'text-success' : 
+                          payment.status === 'pending' ? 'text-warning' : 'text-destructive'
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-medium">{payment.month} {payment.year}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(payment.created_at), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Monthly Subscription</p>
-                      <p className="text-sm text-muted-foreground">{payment.date}</p>
+                    <div className="text-right">
+                      {payment.amount && <p className="font-semibold">${payment.amount}</p>}
+                      <PaymentStatusBadge status={payment.status} />
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{payment.amount}</p>
-                    <PaymentStatusBadge status={payment.status} />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
