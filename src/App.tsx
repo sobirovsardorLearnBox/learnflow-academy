@@ -9,12 +9,14 @@ import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import Dashboard from "./pages/Dashboard";
 import Payment from "./pages/Payment";
+import Profile from "./pages/Profile";
 import Lesson from "./pages/Lesson";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminSections from "./pages/admin/AdminSections";
 import AdminDevices from "./pages/admin/AdminDevices";
 import AdminProgress from "./pages/admin/AdminProgress";
+import AdminSettings from "./pages/admin/AdminSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +74,12 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      } />
+
       <Route path="/payment" element={
         <ProtectedRoute allowedRoles={['student']}>
           <Payment />
@@ -117,7 +125,7 @@ function AppRoutes() {
 
       <Route path="/admin/settings" element={
         <ProtectedRoute allowedRoles={['admin']}>
-          <AdminUsers />
+          <AdminSettings />
         </ProtectedRoute>
       } />
 

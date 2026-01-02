@@ -13,6 +13,7 @@ import {
   Shield,
   Menu,
   BarChart3,
+  User,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -23,12 +24,14 @@ const navItems = {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { icon: GraduationCap, label: 'My Courses', path: '/courses' },
     { icon: CreditCard, label: 'Payment', path: '/payment' },
+    { icon: User, label: 'Profile', path: '/profile' },
   ],
   teacher: [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
     { icon: Users, label: 'My Groups', path: '/groups' },
     { icon: GraduationCap, label: 'Lessons', path: '/lessons' },
     { icon: BarChart3, label: 'Student Progress', path: '/admin/progress' },
+    { icon: User, label: 'Profile', path: '/profile' },
   ],
   admin: [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
@@ -38,6 +41,7 @@ const navItems = {
     { icon: Shield, label: 'Devices', path: '/admin/devices' },
     { icon: BarChart3, label: 'Student Progress', path: '/admin/progress' },
     { icon: Settings, label: 'Settings', path: '/admin/settings' },
+    { icon: User, label: 'Profile', path: '/profile' },
   ],
 };
 
