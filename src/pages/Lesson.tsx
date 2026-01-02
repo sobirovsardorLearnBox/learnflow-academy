@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, BookOpen, Video, FileText, HelpCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { VideoPlayer } from '@/components/lesson/VideoPlayer';
 import { QuizComponent } from '@/components/lesson/QuizComponent';
@@ -255,7 +256,7 @@ export default function Lesson() {
                       {currentLesson.content ? (
                         <div 
                           className="prose prose-sm dark:prose-invert max-w-none"
-                          dangerouslySetInnerHTML={{ __html: currentLesson.content }}
+                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentLesson.content) }}
                         />
                       ) : (
                         <div className="flex flex-col items-center justify-center py-8">
