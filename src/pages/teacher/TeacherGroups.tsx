@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2 } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3 } from 'lucide-react';
+import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
 
 interface Group {
   id: string;
@@ -54,7 +55,9 @@ export default function TeacherGroups() {
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [isProgressOpen, setIsProgressOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
   const [selectedStudentId, setSelectedStudentId] = useState('');
 
@@ -384,7 +387,7 @@ export default function TeacherGroups() {
                   <TableRow>
                     <TableHead>Ism</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead className="w-20"></TableHead>
+                    <TableHead className="w-32 text-center">Amallar</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -393,13 +396,27 @@ export default function TeacherGroups() {
                       <TableCell>{member.name}</TableCell>
                       <TableCell>{member.email}</TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removeMember.mutate(member.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                        <div className="flex items-center gap-1 justify-center">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedStudent(member);
+                              setIsProgressOpen(true);
+                            }}
+                            title="Progressni ko'rish"
+                          >
+                            <BarChart3 className="w-4 h-4 text-primary" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => removeMember.mutate(member.id)}
+                            title="O'chirish"
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -454,6 +471,13 @@ export default function TeacherGroups() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Student Progress Dialog */}
+        <StudentProgressDialog
+          open={isProgressOpen}
+          onOpenChange={setIsProgressOpen}
+          student={selectedStudent}
+        />
       </div>
     </DashboardLayout>
   );
