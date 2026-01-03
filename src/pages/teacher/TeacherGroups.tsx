@@ -33,6 +33,7 @@ import {
 import { toast } from 'sonner';
 import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3 } from 'lucide-react';
 import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
+import { GroupProgressStats } from '@/components/teacher/GroupProgressStats';
 
 interface Group {
   id: string;
@@ -371,6 +372,14 @@ export default function TeacherGroups() {
                 </div>
               </DialogTitle>
             </DialogHeader>
+
+            {/* Group Progress Stats */}
+            {groupMembers && groupMembers.length > 0 && (
+              <GroupProgressStats
+                groupId={selectedGroup?.id || ''}
+                memberUserIds={groupMembers.map((m) => m.user_id)}
+              />
+            )}
 
             {membersLoading ? (
               <div className="flex items-center justify-center py-8">
