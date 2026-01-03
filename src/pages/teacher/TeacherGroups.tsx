@@ -31,9 +31,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3 } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download } from 'lucide-react';
 import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
 import { GroupProgressStats } from '@/components/teacher/GroupProgressStats';
+import { format } from 'date-fns';
 
 interface Group {
   id: string;
@@ -232,6 +233,60 @@ export default function TeacherGroups() {
     onError: () => toast.error("Talabani olib tashlashda xatolik"),
   });
 
+  const exportGroupToCSV = async () => {
+    if (!selectedGroup || !groupMembers || groupMembers.length === 0) return;
+
+    try {
+      // Fetch all lessons
+      const { data: lessons } = await supabase
+        .from('lessons')
+        .select('id, title')
+        .eq('is_active', true);
+
+      const totalLessons = lessons?.length || 0;
+
+      // Fetch progress for all group members
+      const { data: allProgress } = await supabase
+        .from('lesson_progress')
+        .select('user_id, lesson_id, completed, completed_at')
+        .in('user_id', groupMembers.map((m) => m.user_id))
+        .eq('completed', true);
+
+      // Build CSV data
+      const headers = ['Ism', 'Email', 'Tugatilgan darslar', 'Jami darslar', 'Progress (%)'];
+      const rows = groupMembers.map((member) => {
+        const memberProgress = allProgress?.filter((p) => p.user_id === member.user_id) || [];
+        const completedCount = memberProgress.length;
+        const percentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+        return [
+          member.name,
+          member.email,
+          completedCount.toString(),
+          totalLessons.toString(),
+          `${percentage}%`,
+        ];
+      });
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+      ].join('\n');
+
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedGroup.name.replace(/\s+/g, '_')}_progress_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('CSV fayl yuklab olindi');
+    } catch {
+      toast.error('Eksport qilishda xatolik');
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -353,6 +408,16 @@ export default function TeacherGroups() {
               <DialogTitle className="flex items-center justify-between">
                 <span>{selectedGroup?.name}</span>
                 <div className="flex gap-2">
+                  {groupMembers && groupMembers.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={exportGroupToCSV}
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      CSV
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     onClick={() => setIsAddMemberOpen(true)}
