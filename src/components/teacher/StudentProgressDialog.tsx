@@ -8,8 +8,10 @@ import {
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, BookOpen, CheckCircle, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, BookOpen, CheckCircle, Clock, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface StudentProgressDialogProps {
   open: boolean;
@@ -130,13 +132,51 @@ export function StudentProgressDialog({
     enabled: !!student?.user_id && open,
   });
 
+  const exportToCSV = () => {
+    if (!progressData || !student) return;
+
+    const headers = ['Dars nomi', 'Bo\'lim', 'Daraja', 'Bo\'lim', 'Holati', 'Tugatilgan sana'];
+    const rows = progressData.items.map((item) => [
+      item.lesson_title,
+      item.section_name,
+      item.level_name,
+      item.unit_name,
+      item.completed ? 'Tugatilgan' : 'Tugatilmagan',
+      item.completed_at ? format(new Date(item.completed_at), 'dd.MM.yyyy') : '-',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${student.name.replace(/\s+/g, '_')}_progress_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('CSV fayl yuklab olindi');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5" />
-            {student?.name} - O'quv progressi
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5" />
+              {student?.name} - O'quv progressi
+            </div>
+            {progressData && progressData.items.length > 0 && (
+              <Button size="sm" variant="outline" onClick={exportToCSV}>
+                <Download className="w-4 h-4 mr-1" />
+                CSV
+              </Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 
