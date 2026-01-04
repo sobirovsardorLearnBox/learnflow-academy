@@ -91,7 +91,7 @@ export default function TeacherGroups() {
     enabled: !!user?.id,
   });
 
-  // Fetch group members
+  // Fetch group members with progress
   const { data: groupMembers, isLoading: membersLoading } = useQuery({
     queryKey: ['group-members', selectedGroup?.id],
     queryFn: async () => {
@@ -104,7 +104,14 @@ export default function TeacherGroups() {
 
       if (error) throw error;
 
-      // Get profile info for each member
+      // Get total lessons count
+      const { data: lessons } = await supabase
+        .from('lessons')
+        .select('id')
+        .eq('is_active', true);
+      const totalLessons = lessons?.length || 0;
+
+      // Get profile info and progress for each member
       const membersWithProfiles = await Promise.all(
         (data || []).map(async (member) => {
           const { data: profile } = await supabase
@@ -112,15 +119,26 @@ export default function TeacherGroups() {
             .select('name, email')
             .eq('user_id', member.user_id)
             .single();
+
+          // Get completed lessons count for this member
+          const { count: completedCount } = await supabase
+            .from('lesson_progress')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', member.user_id)
+            .eq('completed', true);
+
+          const progress = totalLessons > 0 ? Math.round(((completedCount || 0) / totalLessons) * 100) : 0;
+
           return {
             ...member,
             name: profile?.name || 'Unknown',
             email: profile?.email || '',
+            progress,
           };
         })
       );
 
-      return membersWithProfiles as Student[];
+      return membersWithProfiles as (Student & { progress: number })[];
     },
     enabled: !!selectedGroup?.id,
   });
@@ -461,6 +479,7 @@ export default function TeacherGroups() {
                   <TableRow>
                     <TableHead>Ism</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead className="w-24 text-center">Progress</TableHead>
                     <TableHead className="w-32 text-center">Amallar</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -469,6 +488,14 @@ export default function TeacherGroups() {
                     <TableRow key={member.id}>
                       <TableCell>{member.name}</TableCell>
                       <TableCell>{member.email}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge 
+                          variant={member.progress >= 100 ? 'default' : member.progress >= 50 ? 'secondary' : 'outline'}
+                          className={member.progress >= 100 ? 'bg-green-500' : ''}
+                        >
+                          {member.progress}%
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 justify-center">
                           <Button
