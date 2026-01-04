@@ -21,27 +21,27 @@ import { cn } from '@/lib/utils';
 
 const navItems = {
   student: [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: GraduationCap, label: 'My Courses', path: '/courses' },
-    { icon: CreditCard, label: 'Payment', path: '/payment' },
-    { icon: User, label: 'Profile', path: '/profile' },
+    { icon: LayoutDashboard, label: 'Bosh sahifa', path: '/dashboard' },
+    { icon: GraduationCap, label: 'Kurslarim', path: '/courses' },
+    { icon: CreditCard, label: "To'lov", path: '/payment' },
+    { icon: User, label: 'Profil', path: '/profile' },
   ],
   teacher: [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: Users, label: 'My Groups', path: '/groups' },
-    { icon: GraduationCap, label: 'Lessons', path: '/lessons' },
-    { icon: BarChart3, label: 'Student Progress', path: '/admin/progress' },
-    { icon: User, label: 'Profile', path: '/profile' },
+    { icon: LayoutDashboard, label: 'Bosh sahifa', path: '/dashboard' },
+    { icon: Users, label: 'Guruhlarim', path: '/groups' },
+    { icon: GraduationCap, label: 'Darslar', path: '/lessons' },
+    { icon: BarChart3, label: 'Talabalar progressi', path: '/admin/progress' },
+    { icon: User, label: 'Profil', path: '/profile' },
   ],
   admin: [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: Users, label: 'Users', path: '/admin/users' },
-    { icon: GraduationCap, label: 'Sections', path: '/admin/sections' },
-    { icon: CreditCard, label: 'Payments', path: '/admin/payments' },
-    { icon: Shield, label: 'Devices', path: '/admin/devices' },
-    { icon: BarChart3, label: 'Student Progress', path: '/admin/progress' },
-    { icon: Settings, label: 'Settings', path: '/admin/settings' },
-    { icon: User, label: 'Profile', path: '/profile' },
+    { icon: LayoutDashboard, label: 'Bosh sahifa', path: '/dashboard' },
+    { icon: Users, label: 'Foydalanuvchilar', path: '/admin/users' },
+    { icon: GraduationCap, label: "Bo'limlar", path: '/admin/sections' },
+    { icon: CreditCard, label: "To'lovlar", path: '/admin/payments' },
+    { icon: Shield, label: 'Qurilmalar', path: '/admin/devices' },
+    { icon: BarChart3, label: 'Talabalar progressi', path: '/admin/progress' },
+    { icon: Settings, label: 'Sozlamalar', path: '/admin/settings' },
+    { icon: User, label: 'Profil', path: '/profile' },
   ],
 };
 
@@ -170,7 +170,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
           onClick={handleLogout}
         >
           <LogOut className="w-4 h-4 shrink-0" />
-          {!isCollapsed && <span className="ml-2">Logout</span>}
+          {!isCollapsed && <span className="ml-2">Chiqish</span>}
         </Button>
       </div>
     </motion.aside>

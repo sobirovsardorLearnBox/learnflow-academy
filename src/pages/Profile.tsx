@@ -34,7 +34,7 @@ export default function Profile() {
 
   const handleUpdateProfile = async () => {
     if (!profileData.name.trim()) {
-      toast.error('Name is required');
+      toast.error('Ism kiritilishi shart');
       return;
     }
 
@@ -48,10 +48,10 @@ export default function Profile() {
       if (error) throw error;
 
       await refreshUser();
-      toast.success('Profile updated successfully');
+      toast.success('Profil muvaffaqiyatli yangilandi');
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      toast.error('Profilni yangilashda xatolik');
     } finally {
       setIsUpdating(false);
     }
@@ -59,17 +59,17 @@ export default function Profile() {
 
   const handleChangePassword = async () => {
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      toast.error('Please fill in all fields');
+      toast.error('Barcha maydonlarni to\'ldiring');
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      toast.error('New password must be at least 6 characters');
+      toast.error('Yangi parol kamida 6 ta belgidan iborat bo\'lishi kerak');
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error('Parollar mos kelmadi');
       return;
     }
 
@@ -86,13 +86,19 @@ export default function Profile() {
         newPassword: '',
         confirmPassword: '',
       });
-      toast.success('Password changed successfully');
+      toast.success('Parol muvaffaqiyatli o\'zgartirildi');
     } catch (error) {
       console.error('Error changing password:', error);
-      toast.error('Failed to change password');
+      toast.error('Parolni o\'zgartirishda xatolik');
     } finally {
       setIsChangingPassword(false);
     }
+  };
+
+  const roleLabels: Record<string, string> = {
+    admin: 'Administrator',
+    teacher: 'O\'qituvchi',
+    student: 'Talaba',
   };
 
   return (
@@ -100,8 +106,8 @@ export default function Profile() {
       <div className="space-y-6 max-w-2xl">
         {/* Header */}
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold">My Profile</h1>
-          <p className="text-muted-foreground mt-1">Manage your account settings</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Mening profilim</h1>
+          <p className="text-muted-foreground mt-1">Akkaunt sozlamalarini boshqaring</p>
         </div>
 
         {/* Profile Card */}
@@ -116,8 +122,8 @@ export default function Profile() {
               <div>
                 <h2 className="text-xl font-semibold">{user.name}</h2>
                 <p className="text-muted-foreground">{user.email}</p>
-                <span className="inline-block mt-2 px-3 py-1 text-xs font-medium rounded-full bg-primary/20 text-primary capitalize">
-                  {user.role}
+                <span className="inline-block mt-2 px-3 py-1 text-xs font-medium rounded-full bg-primary/20 text-primary">
+                  {roleLabels[user.role] || user.role}
                 </span>
               </div>
             </div>
@@ -128,11 +134,11 @@ export default function Profile() {
           <TabsList>
             <TabsTrigger value="profile" className="gap-2">
               <User className="w-4 h-4" />
-              Profile
+              Profil
             </TabsTrigger>
             <TabsTrigger value="security" className="gap-2">
               <Lock className="w-4 h-4" />
-              Security
+              Xavfsizlik
             </TabsTrigger>
           </TabsList>
 
@@ -143,12 +149,12 @@ export default function Profile() {
             >
               <Card>
                 <CardHeader>
-                  <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update your personal information</CardDescription>
+                  <CardTitle>Profil ma'lumotlari</CardTitle>
+                  <CardDescription>Shaxsiy ma'lumotlaringizni yangilang</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
+                    <Label htmlFor="name">To'liq ism</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -156,7 +162,7 @@ export default function Profile() {
                         value={profileData.name}
                         onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
                         className="pl-10"
-                        placeholder="Enter your name"
+                        placeholder="Ismingizni kiriting"
                       />
                     </div>
                   </div>
@@ -171,7 +177,7 @@ export default function Profile() {
                         className="pl-10 bg-secondary/50"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                    <p className="text-xs text-muted-foreground">Emailni o'zgartirish mumkin emas</p>
                   </div>
                   <Button onClick={handleUpdateProfile} disabled={isUpdating} className="w-full">
                     {isUpdating ? (
@@ -179,7 +185,7 @@ export default function Profile() {
                     ) : (
                       <Save className="w-4 h-4 mr-2" />
                     )}
-                    Save Changes
+                    O'zgarishlarni saqlash
                   </Button>
                 </CardContent>
               </Card>
@@ -193,12 +199,12 @@ export default function Profile() {
             >
               <Card>
                 <CardHeader>
-                  <CardTitle>Change Password</CardTitle>
-                  <CardDescription>Update your account password</CardDescription>
+                  <CardTitle>Parolni o'zgartirish</CardTitle>
+                  <CardDescription>Akkaunt parolingizni yangilang</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current Password</Label>
+                    <Label htmlFor="currentPassword">Joriy parol</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -207,7 +213,7 @@ export default function Profile() {
                         value={passwordData.currentPassword}
                         onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
                         className="pl-10 pr-10"
-                        placeholder="Enter current password"
+                        placeholder="Joriy parolni kiriting"
                       />
                       <button
                         type="button"
@@ -219,7 +225,7 @@ export default function Profile() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">New Password</Label>
+                    <Label htmlFor="newPassword">Yangi parol</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -228,7 +234,7 @@ export default function Profile() {
                         value={passwordData.newPassword}
                         onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
                         className="pl-10 pr-10"
-                        placeholder="Enter new password"
+                        placeholder="Yangi parolni kiriting"
                       />
                       <button
                         type="button"
@@ -240,7 +246,7 @@ export default function Profile() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Label htmlFor="confirmPassword">Yangi parolni tasdiqlang</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -249,7 +255,7 @@ export default function Profile() {
                         value={passwordData.confirmPassword}
                         onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
                         className="pl-10"
-                        placeholder="Confirm new password"
+                        placeholder="Yangi parolni qayta kiriting"
                       />
                     </div>
                   </div>
@@ -259,7 +265,7 @@ export default function Profile() {
                     ) : (
                       <Lock className="w-4 h-4 mr-2" />
                     )}
-                    Change Password
+                    Parolni o'zgartirish
                   </Button>
                 </CardContent>
               </Card>
