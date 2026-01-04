@@ -1,11 +1,9 @@
-import { useLocation, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Home, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
-  const location = useLocation();
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Effects */}
@@ -28,20 +26,20 @@ const NotFound = () => {
           404
         </motion.div>
         
-        <h1 className="text-2xl font-semibold mt-4">Page Not Found</h1>
+        <h1 className="text-2xl font-semibold mt-4">Sahifa topilmadi</h1>
         <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-          The page you're looking for doesn't exist or has been moved.
+          Siz qidirayotgan sahifa mavjud emas yoki ko'chirilgan.
         </p>
 
         <div className="flex items-center justify-center gap-4 mt-8">
           <Button variant="outline" onClick={() => window.history.back()}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
+            Orqaga
           </Button>
           <Button variant="premium" asChild>
             <Link to="/">
               <Home className="w-4 h-4 mr-2" />
-              Home
+              Bosh sahifa
             </Link>
           </Button>
         </div>
