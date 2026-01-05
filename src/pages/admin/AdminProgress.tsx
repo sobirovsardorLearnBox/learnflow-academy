@@ -21,7 +21,7 @@ type SortColumn = 'name' | 'progress' | 'lastActivity';
 type SortDirection = 'asc' | 'desc';
 
 const progressRanges: { value: ProgressRange; label: string; min: number; max: number }[] = [
-  { value: 'all', label: 'All', min: 0, max: 100 },
+  { value: 'all', label: 'Barchasi', min: 0, max: 100 },
   { value: '0-25', label: '0-25%', min: 0, max: 25 },
   { value: '25-50', label: '25-50%', min: 25, max: 50 },
   { value: '50-75', label: '50-75%', min: 50, max: 75 },
@@ -99,7 +99,7 @@ export default function AdminProgress() {
   const exportToCSV = () => {
     if (!sortedStudents.length) return;
 
-    const headers = ['Name', 'Email', 'Completed Lessons', 'Total Lessons', 'Completed Units', 'Total Units', 'Progress %', 'Last Activity'];
+    const headers = ['Ism', 'Email', "Tugatilgan darslar", 'Jami darslar', "Tugatilgan bo'limlar", "Jami bo'limlar", 'Progress %', "Oxirgi faollik"];
     const rows = sortedStudents.map(s => [
       s.name,
       s.email,
@@ -108,7 +108,7 @@ export default function AdminProgress() {
       s.completedUnits,
       s.totalUnits,
       s.progressPercentage,
-      s.lastActivity ? format(new Date(s.lastActivity), 'yyyy-MM-dd') : 'Never'
+      s.lastActivity ? format(new Date(s.lastActivity), 'yyyy-MM-dd') : "Hech qachon"
     ]);
 
     const csvContent = [headers, ...rows]
@@ -118,7 +118,7 @@ export default function AdminProgress() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `student-progress-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.download = `talabalar-progress-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     link.click();
   };
 
@@ -138,12 +138,12 @@ export default function AdminProgress() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Student Progress</h1>
-            <p className="text-muted-foreground">Track student completion status across all courses</p>
+            <h1 className="text-3xl font-bold">Talabalar progressi</h1>
+            <p className="text-muted-foreground">Talabalarning kurs bo'yicha taraqqiyotini kuzatish</p>
           </div>
           <Button onClick={exportToCSV} disabled={!sortedStudents.length}>
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            CSV yuklash
           </Button>
         </div>
 
@@ -151,7 +151,7 @@ export default function AdminProgress() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <CardTitle className="text-sm font-medium">Jami talabalar</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -161,7 +161,7 @@ export default function AdminProgress() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Progress</CardTitle>
+              <CardTitle className="text-sm font-medium">O'rtacha progress</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -171,7 +171,7 @@ export default function AdminProgress() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Course Completed</CardTitle>
+              <CardTitle className="text-sm font-medium">Kursni tugatgan</CardTitle>
               <Trophy className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -181,7 +181,7 @@ export default function AdminProgress() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Active This Week</CardTitle>
+              <CardTitle className="text-sm font-medium">Bu hafta faol</CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -195,7 +195,7 @@ export default function AdminProgress() {
           <div className="relative max-w-sm flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search students..."
+              placeholder="Talabalarni qidirish..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -226,12 +226,12 @@ export default function AdminProgress() {
                     onClick={() => handleSort('name')}
                   >
                     <div className="flex items-center">
-                      Student
+                      Talaba
                       {getSortIcon('name')}
                     </div>
                   </TableHead>
-                  <TableHead>Lessons</TableHead>
-                  <TableHead>Units</TableHead>
+                  <TableHead>Darslar</TableHead>
+                  <TableHead>Bo'limlar</TableHead>
                   <TableHead 
                     className="w-[200px] cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('progress')}
@@ -246,7 +246,7 @@ export default function AdminProgress() {
                     onClick={() => handleSort('lastActivity')}
                   >
                     <div className="flex items-center">
-                      Last Activity
+                      Oxirgi faollik
                       {getSortIcon('lastActivity')}
                     </div>
                   </TableHead>
@@ -256,7 +256,7 @@ export default function AdminProgress() {
                 {sortedStudents.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No students found
+                      Talabalar topilmadi
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -290,7 +290,7 @@ export default function AdminProgress() {
                       <TableCell className="text-muted-foreground">
                         {student.lastActivity
                           ? format(new Date(student.lastActivity), 'MMM d, yyyy')
-                          : 'Never'}
+                          : "Hech qachon"}
                       </TableCell>
                     </TableRow>
                   ))

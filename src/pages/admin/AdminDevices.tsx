@@ -27,9 +27,9 @@ export default function AdminDevices() {
   });
 
   const stats = [
-    { label: 'Total Devices', value: devices?.length || 0, icon: Monitor, color: 'from-primary to-accent' },
-    { label: 'Approved', value: devices?.filter((d) => d.is_approved).length || 0, icon: CheckCircle2, color: 'from-success to-emerald-400' },
-    { label: 'Pending', value: devices?.filter((d) => !d.is_approved).length || 0, icon: XCircle, color: 'from-warning to-orange-500' },
+    { label: 'Jami qurilmalar', value: devices?.length || 0, icon: Monitor, color: 'from-primary to-accent' },
+    { label: 'Tasdiqlangan', value: devices?.filter((d) => d.is_approved).length || 0, icon: CheckCircle2, color: 'from-success to-emerald-400' },
+    { label: 'Kutilmoqda', value: devices?.filter((d) => !d.is_approved).length || 0, icon: XCircle, color: 'from-warning to-orange-500' },
   ];
 
   const handleApprove = (deviceId: string) => {
@@ -55,8 +55,8 @@ export default function AdminDevices() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold">Device Management</h1>
-          <p className="text-muted-foreground mt-1">Manage user devices and approvals</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">Qurilmalarni boshqarish</h1>
+          <p className="text-muted-foreground mt-1">Foydalanuvchi qurilmalarini boshqarish va tasdiqlash</p>
         </div>
 
         {/* Stats */}
@@ -92,22 +92,25 @@ export default function AdminDevices() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search devices..."
+                  placeholder="Qurilmalarni qidirish..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
               <div className="flex gap-2">
-                {['all', 'approved', 'pending'].map((filter) => (
+                {[
+                  { value: 'all', label: 'Barchasi' },
+                  { value: 'approved', label: 'Tasdiqlangan' },
+                  { value: 'pending', label: 'Kutilmoqda' },
+                ].map((filter) => (
                   <Button
-                    key={filter}
-                    variant={selectedFilter === filter ? 'default' : 'outline'}
+                    key={filter.value}
+                    variant={selectedFilter === filter.value ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setSelectedFilter(filter)}
-                    className="capitalize"
+                    onClick={() => setSelectedFilter(filter.value)}
                   >
-                    {filter}
+                    {filter.label}
                   </Button>
                 ))}
               </div>
@@ -118,7 +121,7 @@ export default function AdminDevices() {
         {/* Devices List */}
         {filteredDevices.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No devices found.</p>
+            <p className="text-muted-foreground">Qurilmalar topilmadi.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -143,19 +146,19 @@ export default function AdminDevices() {
                           )} />
                         </div>
                         <div>
-                          <p className="font-medium">{device.userName || 'Unknown User'}</p>
-                          <p className="text-sm text-muted-foreground">{device.userEmail || 'Unknown Email'}</p>
+                          <p className="font-medium">{device.userName || "Noma'lum foydalanuvchi"}</p>
+                          <p className="text-sm text-muted-foreground">{device.userEmail || "Noma'lum email"}</p>
                           <p className="text-xs text-muted-foreground mt-1 truncate max-w-xs">
-                            {device.device_name || 'Unknown Device'}
+                            {device.device_name || "Noma'lum qurilma"}
                           </p>
                         </div>
                       </div>
 
                       <div className="hidden md:block text-center">
                         <p className="text-sm">
-                          {device.last_login ? new Date(device.last_login).toLocaleDateString() : 'Never'}
+                          {device.last_login ? new Date(device.last_login).toLocaleDateString() : "Hech qachon"}
                         </p>
-                        <p className="text-xs text-muted-foreground">Last Login</p>
+                        <p className="text-xs text-muted-foreground">Oxirgi kirish</p>
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -166,12 +169,12 @@ export default function AdminDevices() {
                           {device.is_approved ? (
                             <>
                               <CheckCircle2 className="w-3 h-3" />
-                              Approved
+                              Tasdiqlangan
                             </>
                           ) : (
                             <>
                               <XCircle className="w-3 h-3" />
-                              Pending
+                              Kutilmoqda
                             </>
                           )}
                         </span>
@@ -184,7 +187,7 @@ export default function AdminDevices() {
                             disabled={updateDeviceStatus.isPending}
                           >
                             <CheckCircle2 className="w-4 h-4 mr-1" />
-                            Approve
+                            Tasdiqlash
                           </Button>
                         )}
 
@@ -196,7 +199,7 @@ export default function AdminDevices() {
                             disabled={updateDeviceStatus.isPending}
                           >
                             <XCircle className="w-4 h-4 mr-1" />
-                            Revoke
+                            Bekor qilish
                           </Button>
                         )}
                       </div>

@@ -227,3 +227,74 @@ export function useUpdateDeviceStatus() {
     },
   });
 }
+
+export function useUpdateUserRole() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: 'admin' | 'teacher' | 'student' }) => {
+      const { error } = await supabase
+        .from('user_roles')
+        .update({ role })
+        .eq('user_id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: "Rol o'zgartirildi",
+        description: "Foydalanuvchi roli muvaffaqiyatli yangilandi.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Xatolik',
+        description: "Rolni o'zgartirib bo'lmadi.",
+        variant: 'destructive',
+      });
+      console.error('Error updating role:', error);
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ userId }: { userId: string }) => {
+      // Delete from profiles (this will cascade to other tables if FK is set)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (profileError) throw profileError;
+
+      // Delete from user_roles
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', userId);
+
+      if (roleError) throw roleError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: "Foydalanuvchi o'chirildi",
+        description: "Foydalanuvchi muvaffaqiyatli o'chirildi.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Xatolik',
+        description: "Foydalanuvchini o'chirib bo'lmadi.",
+        variant: 'destructive',
+      });
+      console.error('Error deleting user:', error);
+    },
+  });
+}
