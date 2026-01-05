@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Search, BookOpen, Video, FileText, Loader2 } from 'lucide-react';
+import { Search, BookOpen, Video, FileText, Loader2, Play, Eye } from 'lucide-react';
 
 interface Lesson {
   id: string;
@@ -50,6 +52,7 @@ interface Section {
 
 export default function TeacherLessons() {
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   const { data: sections, isLoading } = useQuery({
     queryKey: ['teacher-lessons-structure'],
@@ -251,7 +254,7 @@ export default function TeacherLessons() {
                                     {unit.lessons.map((lesson) => (
                                       <div
                                         key={lesson.id}
-                                        className="flex items-center justify-between bg-background p-3 rounded-md"
+                                        className="flex items-center justify-between bg-background p-3 rounded-md hover:bg-muted/50 transition-colors"
                                       >
                                         <div className="flex items-center gap-3">
                                           {lesson.video_url ? (
@@ -276,6 +279,14 @@ export default function TeacherLessons() {
                                               {lesson.duration_minutes} daq
                                             </Badge>
                                           )}
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => navigate(`/lesson/${unit.id}`)}
+                                            title="Darsni ko'rish"
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                          </Button>
                                         </div>
                                       </div>
                                     ))}

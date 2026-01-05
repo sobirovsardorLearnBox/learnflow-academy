@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download, Pencil, Search } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
 import { GroupProgressStats } from '@/components/teacher/GroupProgressStats';
 import { format } from 'date-fns';
@@ -56,12 +57,16 @@ export default function TeacherGroups() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isProgressOpen, setIsProgressOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
+  const [editGroup, setEditGroup] = useState({ name: '', description: '' });
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
   // Fetch groups
   const { data: groups, isLoading: groupsLoading } = useQuery({
@@ -197,6 +202,47 @@ export default function TeacherGroups() {
       toast.success('Guruh yaratildi');
     },
     onError: () => toast.error('Guruh yaratishda xatolik'),
+  });
+
+  // Update group mutation
+  const updateGroup = useMutation({
+    mutationFn: async () => {
+      if (!editingGroup) return;
+      const { error } = await supabase
+        .from('groups')
+        .update({
+          name: editGroup.name,
+          description: editGroup.description || null,
+        })
+        .eq('id', editingGroup.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      setIsEditOpen(false);
+      setEditingGroup(null);
+      if (selectedGroup && editingGroup && selectedGroup.id === editingGroup.id) {
+        setSelectedGroup({ ...selectedGroup, name: editGroup.name, description: editGroup.description });
+      }
+      toast.success('Guruh yangilandi');
+    },
+    onError: () => toast.error('Guruhni yangilashda xatolik'),
+  });
+
+  // Toggle group active status
+  const toggleGroupStatus = useMutation({
+    mutationFn: async ({ groupId, isActive }: { groupId: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from('groups')
+        .update({ is_active: isActive })
+        .eq('id', groupId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      toast.success('Guruh holati yangilandi');
+    },
+    onError: () => toast.error('Guruh holatini yangilashda xatolik'),
   });
 
   // Delete group mutation
@@ -336,18 +382,41 @@ export default function TeacherGroups() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{group.name}</CardTitle>
-                    <Badge variant={group.is_active ? 'default' : 'secondary'}>
-                      {group.is_active ? 'Faol' : 'Nofaol'}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={group.is_active}
+                        onCheckedChange={(checked) => {
+                          toggleGroupStatus.mutate({ groupId: group.id, isActive: checked });
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingGroup(group);
+                          setEditGroup({ name: group.name, description: group.description || '' });
+                          setIsEditOpen(true);
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                   <CardDescription className="line-clamp-2">
                     {group.description || "Ta'rif yo'q"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Users className="w-4 h-4" />
-                    <span>{group.member_count} ta talaba</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      <span>{group.member_count} ta talaba</span>
+                    </div>
+                    <Badge variant={group.is_active ? 'default' : 'secondary'}>
+                      {group.is_active ? 'Faol' : 'Nofaol'}
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -528,33 +597,55 @@ export default function TeacherGroups() {
         </Dialog>
 
         {/* Add Member Dialog */}
-        <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
+        <Dialog open={isAddMemberOpen} onOpenChange={(open) => {
+          setIsAddMemberOpen(open);
+          if (!open) setStudentSearchQuery('');
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Talaba qo'shish</DialogTitle>
             </DialogHeader>
-            <div>
-              <label className="text-sm font-medium">Talabani tanlang</label>
-              <Select
-                value={selectedStudentId}
-                onValueChange={setSelectedStudentId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Talaba tanlang" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableStudents?.map((student) => (
-                    <SelectItem key={student.user_id} value={student.user_id}>
-                      {student.name} ({student.email})
-                    </SelectItem>
-                  ))}
-                  {availableStudents?.length === 0 && (
-                    <SelectItem value="none" disabled>
-                      Qo'shish uchun talaba yo'q
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Talabani qidirish..."
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Talabani tanlang</label>
+                <Select
+                  value={selectedStudentId}
+                  onValueChange={setSelectedStudentId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Talaba tanlang" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableStudents
+                      ?.filter((student) =>
+                        student.name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                        student.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                      )
+                      .map((student) => (
+                        <SelectItem key={student.user_id} value={student.user_id}>
+                          {student.name} ({student.email})
+                        </SelectItem>
+                      ))}
+                    {availableStudents?.filter((student) =>
+                      student.name?.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                      student.email?.toLowerCase().includes(studentSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <SelectItem value="none" disabled>
+                        Qo'shish uchun talaba yo'q
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button
@@ -568,6 +659,51 @@ export default function TeacherGroups() {
                 disabled={!selectedStudentId || addMember.isPending}
               >
                 Qo'shish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Group Dialog */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Guruhni tahrirlash</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Guruh nomi</label>
+                <Input
+                  value={editGroup.name}
+                  onChange={(e) =>
+                    setEditGroup({ ...editGroup, name: e.target.value })
+                  }
+                  placeholder="Guruh nomi"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Ta'rif</label>
+                <Textarea
+                  value={editGroup.description}
+                  onChange={(e) =>
+                    setEditGroup({ ...editGroup, description: e.target.value })
+                  }
+                  placeholder="Guruh haqida qisqacha ma'lumot"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                Bekor qilish
+              </Button>
+              <Button
+                onClick={() => updateGroup.mutate()}
+                disabled={!editGroup.name || updateGroup.isPending}
+              >
+                {updateGroup.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Saqlash
               </Button>
             </DialogFooter>
           </DialogContent>
