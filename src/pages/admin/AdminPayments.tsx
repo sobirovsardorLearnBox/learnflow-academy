@@ -30,16 +30,16 @@ export default function AdminPayments() {
   });
 
   const stats = [
-    { label: 'Total Payments', value: payments?.length || 0, icon: CheckCircle2, color: 'from-primary to-accent' },
-    { label: 'Pending', value: payments?.filter((p) => p.status === 'pending').length || 0, icon: Clock, color: 'from-warning to-orange-500' },
-    { label: 'Approved', value: payments?.filter((p) => p.status === 'approved').length || 0, icon: CheckCircle2, color: 'from-success to-emerald-400' },
-    { label: 'Blocked', value: payments?.filter((p) => p.status === 'blocked').length || 0, icon: XCircle, color: 'from-destructive to-rose-400' },
+    { label: "Jami to'lovlar", value: payments?.length || 0, icon: CheckCircle2, color: 'from-primary to-accent' },
+    { label: 'Kutilmoqda', value: payments?.filter((p) => p.status === 'pending').length || 0, icon: Clock, color: 'from-warning to-orange-500' },
+    { label: 'Tasdiqlangan', value: payments?.filter((p) => p.status === 'approved').length || 0, icon: CheckCircle2, color: 'from-success to-emerald-400' },
+    { label: 'Bloklangan', value: payments?.filter((p) => p.status === 'blocked').length || 0, icon: XCircle, color: 'from-destructive to-rose-400' },
   ];
 
   const statusConfig = {
-    pending: { icon: Clock, label: 'Pending', color: 'bg-warning/20 text-warning' },
-    approved: { icon: CheckCircle2, label: 'Approved', color: 'bg-success/20 text-success' },
-    blocked: { icon: XCircle, label: 'Blocked', color: 'bg-destructive/20 text-destructive' },
+    pending: { icon: Clock, label: 'Kutilmoqda', color: 'bg-warning/20 text-warning' },
+    approved: { icon: CheckCircle2, label: 'Tasdiqlangan', color: 'bg-success/20 text-success' },
+    blocked: { icon: XCircle, label: 'Bloklangan', color: 'bg-destructive/20 text-destructive' },
   };
 
   const handleApprove = (paymentId: string) => {
@@ -65,8 +65,8 @@ export default function AdminPayments() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold">Payment Management</h1>
-          <p className="text-muted-foreground mt-1">Review and manage subscription payments</p>
+          <h1 className="text-2xl lg:text-3xl font-bold">To'lovlarni boshqarish</h1>
+          <p className="text-muted-foreground mt-1">Obuna to'lovlarini ko'rib chiqish va boshqarish</p>
         </div>
 
         {/* Stats */}
@@ -102,22 +102,26 @@ export default function AdminPayments() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search payments..."
+                  placeholder="To'lovlarni qidirish..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
               <div className="flex gap-2">
-                {['all', 'pending', 'approved', 'blocked'].map((status) => (
+                {[
+                  { value: 'all', label: 'Barchasi' },
+                  { value: 'pending', label: 'Kutilmoqda' },
+                  { value: 'approved', label: 'Tasdiqlangan' },
+                  { value: 'blocked', label: 'Bloklangan' },
+                ].map((status) => (
                   <Button
-                    key={status}
-                    variant={selectedStatus === status ? 'default' : 'outline'}
+                    key={status.value}
+                    variant={selectedStatus === status.value ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setSelectedStatus(status)}
-                    className="capitalize"
+                    onClick={() => setSelectedStatus(status.value)}
                   >
-                    {status}
+                    {status.label}
                   </Button>
                 ))}
               </div>
@@ -128,7 +132,7 @@ export default function AdminPayments() {
         {/* Payments List */}
         {filteredPayments.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No payments found.</p>
+            <p className="text-muted-foreground">To'lovlar topilmadi.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -156,7 +160,7 @@ export default function AdminPayments() {
 
                         <div className="hidden md:block text-center">
                           <p className="font-semibold text-lg">${payment.amount || '29.99'}</p>
-                          <p className="text-xs text-muted-foreground">Monthly</p>
+                          <p className="text-xs text-muted-foreground">Oylik</p>
                         </div>
 
                         <div className="hidden md:block text-center">
@@ -198,8 +202,8 @@ export default function AdminPayments() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>View Details</DropdownMenuItem>
-                              <DropdownMenuItem>Send Reminder</DropdownMenuItem>
+                              <DropdownMenuItem>Batafsil ko'rish</DropdownMenuItem>
+                              <DropdownMenuItem>Eslatma yuborish</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
