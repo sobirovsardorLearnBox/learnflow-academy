@@ -147,21 +147,99 @@ export function useUpdatePaymentStatus() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['admin-payments'] });
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       toast({
-        title: 'Payment Updated',
-        description: 'Payment status has been updated successfully.',
+        title: "To'lov yangilandi",
+        description: status === 'approved' 
+          ? "To'lov muvaffaqiyatli tasdiqlandi." 
+          : "To'lov bloklandi.",
       });
     },
     onError: (error) => {
       toast({
-        title: 'Error',
-        description: 'Failed to update payment status.',
+        title: 'Xatolik',
+        description: "To'lov holatini yangilab bo'lmadi.",
         variant: 'destructive',
       });
       console.error('Error updating payment:', error);
+    },
+  });
+}
+
+export function useCreatePayment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ userId, amount, month, year, notes }: { 
+      userId: string; 
+      amount: number; 
+      month: string; 
+      year: number;
+      notes?: string;
+    }) => {
+      const { error } = await supabase
+        .from('payments')
+        .insert({ 
+          user_id: userId,
+          amount,
+          month,
+          year,
+          notes,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: "To'lov qo'shildi",
+        description: "Yangi to'lov muvaffaqiyatli qo'shildi.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Xatolik',
+        description: "To'lovni qo'shib bo'lmadi.",
+        variant: 'destructive',
+      });
+      console.error('Error creating payment:', error);
+    },
+  });
+}
+
+export function useDeletePayment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ paymentId }: { paymentId: string }) => {
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      toast({
+        title: "To'lov o'chirildi",
+        description: "To'lov muvaffaqiyatli o'chirildi.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Xatolik',
+        description: "To'lovni o'chirib bo'lmadi.",
+        variant: 'destructive',
+      });
+      console.error('Error deleting payment:', error);
     },
   });
 }
