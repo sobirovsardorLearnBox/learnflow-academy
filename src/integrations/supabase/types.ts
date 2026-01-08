@@ -49,20 +49,29 @@ export type Database = {
       }
       group_members: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           group_id: string
           id: string
+          is_approved: boolean
           joined_at: string
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           group_id: string
           id?: string
+          is_approved?: boolean
           joined_at?: string
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           group_id?: string
           id?: string
+          is_approved?: boolean
           joined_at?: string
           user_id?: string
         }
