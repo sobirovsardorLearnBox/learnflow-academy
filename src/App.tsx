@@ -17,6 +17,7 @@ import AdminSections from "./pages/admin/AdminSections";
 import AdminDevices from "./pages/admin/AdminDevices";
 import AdminProgress from "./pages/admin/AdminProgress";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminGroups from "./pages/admin/AdminGroups";
 import TeacherGroups from "./pages/teacher/TeacherGroups";
 import TeacherLessons from "./pages/teacher/TeacherLessons";
 import NotFound from "./pages/NotFound";
@@ -110,6 +111,12 @@ function AppRoutes() {
       <Route path="/admin/sections" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminSections />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/groups" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminGroups />
         </ProtectedRoute>
       } />
 

@@ -14,6 +14,7 @@ import {
   Menu,
   BarChart3,
   User,
+  UsersRound,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ const navItems = {
   admin: [
     { icon: LayoutDashboard, label: 'Bosh sahifa', path: '/dashboard' },
     { icon: Users, label: 'Foydalanuvchilar', path: '/admin/users' },
+    { icon: UsersRound, label: 'Guruhlar', path: '/admin/groups' },
     { icon: GraduationCap, label: "Bo'limlar", path: '/admin/sections' },
     { icon: CreditCard, label: "To'lovlar", path: '/admin/payments' },
     { icon: Shield, label: 'Qurilmalar', path: '/admin/devices' },

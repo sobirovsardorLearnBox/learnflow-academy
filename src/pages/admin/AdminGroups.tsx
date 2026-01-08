@@ -31,11 +31,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download, Pencil, Search, Clock, UserCheck } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, Download, Pencil, Search, Check, X, GraduationCap, UserCheck } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
-import { GroupProgressStats } from '@/components/teacher/GroupProgressStats';
 import { format } from 'date-fns';
+
+interface Teacher {
+  user_id: string;
+  name: string;
+  email: string;
+}
 
 interface Group {
   id: string;
@@ -45,54 +49,87 @@ interface Group {
   created_at: string;
   teacher_id: string;
   teacher_name?: string;
+  teacher_email?: string;
   member_count?: number;
   pending_count?: number;
 }
 
-interface Student {
+interface GroupMember {
   id: string;
   user_id: string;
   name: string;
   email: string;
-  is_approved?: boolean;
+  is_approved: boolean;
+  joined_at: string;
 }
 
-export default function TeacherGroups() {
+export default function AdminGroups() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [isProgressOpen, setIsProgressOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [newGroup, setNewGroup] = useState({ name: '', description: '' });
-  const [editGroup, setEditGroup] = useState({ name: '', description: '' });
+  const [newGroup, setNewGroup] = useState({ name: '', description: '', teacher_id: '' });
+  const [editGroup, setEditGroup] = useState({ name: '', description: '', teacher_id: '' });
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
 
-  // Fetch groups with teacher info
+  // Fetch teachers
+  const { data: teachers } = useQuery({
+    queryKey: ['teachers'],
+    queryFn: async () => {
+      const { data: teacherRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'teacher');
+
+      if (rolesError) throw rolesError;
+
+      const teacherUserIds = teacherRoles?.map((r) => r.user_id) || [];
+      if (teacherUserIds.length === 0) return [];
+
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .in('user_id', teacherUserIds);
+
+      if (profilesError) throw profilesError;
+
+      return profiles as Teacher[];
+    },
+  });
+
+  // Fetch all groups with teacher info
   const { data: groups, isLoading: groupsLoading } = useQuery({
-    queryKey: ['teacher-groups', user?.id],
+    queryKey: ['admin-groups'],
     queryFn: async () => {
       const { data: groupsData, error } = await supabase
         .from('groups')
         .select('*')
-        .eq('teacher_id', user?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get member counts (approved only) and pending counts
-      const groupsWithCounts = await Promise.all(
+      // Get teacher profiles and member counts
+      const groupsWithDetails = await Promise.all(
         (groupsData || []).map(async (group) => {
-          const { count: approvedCount } = await supabase
+          // Get teacher profile
+          const { data: teacherProfile } = await supabase
+            .from('profiles')
+            .select('name, email')
+            .eq('user_id', group.teacher_id)
+            .single();
+
+          // Get approved member count
+          const { count: memberCount } = await supabase
             .from('group_members')
             .select('*', { count: 'exact', head: true })
             .eq('group_id', group.id)
             .eq('is_approved', true);
 
+          // Get pending member count
           const { count: pendingCount } = await supabase
             .from('group_members')
             .select('*', { count: 'exact', head: true })
@@ -101,40 +138,34 @@ export default function TeacherGroups() {
 
           return {
             ...group,
-            member_count: approvedCount || 0,
+            teacher_name: teacherProfile?.name || 'Unknown',
+            teacher_email: teacherProfile?.email || '',
+            member_count: memberCount || 0,
             pending_count: pendingCount || 0,
           };
         })
       );
 
-      return groupsWithCounts as Group[];
+      return groupsWithDetails as Group[];
     },
-    enabled: !!user?.id,
   });
 
-  // Fetch group members with progress (only approved members shown, pending visible separately)
+  // Fetch group members
   const { data: groupMembers, isLoading: membersLoading } = useQuery({
-    queryKey: ['group-members', selectedGroup?.id],
+    queryKey: ['admin-group-members', selectedGroup?.id],
     queryFn: async () => {
       if (!selectedGroup) return [];
 
       const { data, error } = await supabase
         .from('group_members')
-        .select('id, user_id, joined_at, is_approved')
+        .select('id, user_id, is_approved, joined_at')
         .eq('group_id', selectedGroup.id)
         .order('is_approved', { ascending: true })
         .order('joined_at', { ascending: false });
 
       if (error) throw error;
 
-      // Get total lessons count
-      const { data: lessons } = await supabase
-        .from('lessons')
-        .select('id')
-        .eq('is_active', true);
-      const totalLessons = lessons?.length || 0;
-
-      // Get profile info and progress for each member
+      // Get profile info for each member
       const membersWithProfiles = await Promise.all(
         (data || []).map(async (member) => {
           const { data: profile } = await supabase
@@ -143,35 +174,23 @@ export default function TeacherGroups() {
             .eq('user_id', member.user_id)
             .single();
 
-          // Get completed lessons count for this member
-          const { count: completedCount } = await supabase
-            .from('lesson_progress')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', member.user_id)
-            .eq('completed', true);
-
-          const progress = totalLessons > 0 ? Math.round(((completedCount || 0) / totalLessons) * 100) : 0;
-
           return {
             ...member,
             name: profile?.name || 'Unknown',
             email: profile?.email || '',
-            progress,
-            is_approved: member.is_approved,
           };
         })
       );
 
-      return membersWithProfiles as (Student & { progress: number; is_approved: boolean })[];
+      return membersWithProfiles as GroupMember[];
     },
     enabled: !!selectedGroup?.id,
   });
 
   // Fetch available students
   const { data: availableStudents } = useQuery({
-    queryKey: ['available-students', selectedGroup?.id],
+    queryKey: ['available-students-admin', selectedGroup?.id],
     queryFn: async () => {
-      // Get all students
       const { data: studentRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -180,18 +199,13 @@ export default function TeacherGroups() {
       if (rolesError) throw rolesError;
 
       const studentUserIds = studentRoles?.map((r) => r.user_id) || [];
-
-      // Get existing members of this group
       const existingMemberIds = groupMembers?.map((m) => m.user_id) || [];
-
-      // Filter out existing members
       const availableUserIds = studentUserIds.filter(
         (id) => !existingMemberIds.includes(id)
       );
 
       if (availableUserIds.length === 0) return [];
 
-      // Get profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('user_id, name, email')
@@ -210,14 +224,14 @@ export default function TeacherGroups() {
       const { error } = await supabase.from('groups').insert({
         name: newGroup.name,
         description: newGroup.description || null,
-        teacher_id: user?.id,
+        teacher_id: newGroup.teacher_id,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
       setIsCreateOpen(false);
-      setNewGroup({ name: '', description: '' });
+      setNewGroup({ name: '', description: '', teacher_id: '' });
       toast.success('Guruh yaratildi');
     },
     onError: () => toast.error('Guruh yaratishda xatolik'),
@@ -232,17 +246,15 @@ export default function TeacherGroups() {
         .update({
           name: editGroup.name,
           description: editGroup.description || null,
+          teacher_id: editGroup.teacher_id,
         })
         .eq('id', editingGroup.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
       setIsEditOpen(false);
       setEditingGroup(null);
-      if (selectedGroup && editingGroup && selectedGroup.id === editingGroup.id) {
-        setSelectedGroup({ ...selectedGroup, name: editGroup.name, description: editGroup.description });
-      }
       toast.success('Guruh yangilandi');
     },
     onError: () => toast.error('Guruhni yangilashda xatolik'),
@@ -258,7 +270,7 @@ export default function TeacherGroups() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
       toast.success('Guruh holati yangilandi');
     },
     onError: () => toast.error('Guruh holatini yangilashda xatolik'),
@@ -271,31 +283,54 @@ export default function TeacherGroups() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
       setSelectedGroup(null);
       toast.success("Guruh o'chirildi");
     },
     onError: () => toast.error("Guruhni o'chirishda xatolik"),
   });
 
-  // Add member mutation (pending admin approval)
+  // Approve member mutation
+  const approveMember = useMutation({
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from('group_members')
+        .update({
+          is_approved: true,
+          approved_at: new Date().toISOString(),
+          approved_by: user?.id,
+        })
+        .eq('id', memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-group-members'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
+      toast.success("Talaba tasdiqlandi");
+    },
+    onError: () => toast.error("Talabani tasdiqlashda xatolik"),
+  });
+
+  // Add member mutation (directly approved by admin)
   const addMember = useMutation({
     mutationFn: async () => {
       if (!selectedGroup || !selectedStudentId) return;
       const { error } = await supabase.from('group_members').insert({
         group_id: selectedGroup.id,
         user_id: selectedStudentId,
-        is_approved: false, // Pending admin approval
+        is_approved: true,
+        approved_at: new Date().toISOString(),
+        approved_by: user?.id,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['group-members'] });
-      queryClient.invalidateQueries({ queryKey: ['available-students'] });
-      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-group-members'] });
+      queryClient.invalidateQueries({ queryKey: ['available-students-admin'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
       setIsAddMemberOpen(false);
       setSelectedStudentId('');
-      toast.success("Talaba qo'shildi - admin tasdiqlashini kutmoqda");
+      toast.success("Talaba qo'shildi va tasdiqlandi");
     },
     onError: () => toast.error("Talabani qo'shishda xatolik"),
   });
@@ -310,75 +345,21 @@ export default function TeacherGroups() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['group-members'] });
-      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-group-members'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
       toast.success("Talaba olib tashlandi");
     },
     onError: () => toast.error("Talabani olib tashlashda xatolik"),
   });
-
-  const exportGroupToCSV = async () => {
-    if (!selectedGroup || !groupMembers || groupMembers.length === 0) return;
-
-    try {
-      // Fetch all lessons
-      const { data: lessons } = await supabase
-        .from('lessons')
-        .select('id, title')
-        .eq('is_active', true);
-
-      const totalLessons = lessons?.length || 0;
-
-      // Fetch progress for all group members
-      const { data: allProgress } = await supabase
-        .from('lesson_progress')
-        .select('user_id, lesson_id, completed, completed_at')
-        .in('user_id', groupMembers.map((m) => m.user_id))
-        .eq('completed', true);
-
-      // Build CSV data
-      const headers = ['Ism', 'Email', 'Tugatilgan darslar', 'Jami darslar', 'Progress (%)'];
-      const rows = groupMembers.map((member) => {
-        const memberProgress = allProgress?.filter((p) => p.user_id === member.user_id) || [];
-        const completedCount = memberProgress.length;
-        const percentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
-        return [
-          member.name,
-          member.email,
-          completedCount.toString(),
-          totalLessons.toString(),
-          `${percentage}%`,
-        ];
-      });
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-      ].join('\n');
-
-      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${selectedGroup.name.replace(/\s+/g, '_')}_progress_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success('CSV fayl yuklab olindi');
-    } catch {
-      toast.error('Eksport qilishda xatolik');
-    }
-  };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Mening Guruhlarim</h1>
+            <h1 className="text-2xl font-bold">Guruhlar boshqaruvi</h1>
             <p className="text-muted-foreground">
-              Talabalar guruhlarini boshqaring
+              Barcha guruhlarni boshqaring va talabalarni tasdiqlang
             </p>
           </div>
           <Button onClick={() => setIsCreateOpen(true)}>
@@ -416,7 +397,11 @@ export default function TeacherGroups() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingGroup(group);
-                          setEditGroup({ name: group.name, description: group.description || '' });
+                          setEditGroup({
+                            name: group.name,
+                            description: group.description || '',
+                            teacher_id: group.teacher_id,
+                          });
                           setIsEditOpen(true);
                         }}
                       >
@@ -428,7 +413,13 @@ export default function TeacherGroups() {
                     {group.description || "Ta'rif yo'q"}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                  {/* Teacher info */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <GraduationCap className="w-4 h-4 text-primary" />
+                    <span className="font-medium">{group.teacher_name}</span>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 text-muted-foreground text-sm">
@@ -436,8 +427,7 @@ export default function TeacherGroups() {
                         <span>{group.member_count} ta</span>
                       </div>
                       {(group.pending_count ?? 0) > 0 && (
-                        <Badge variant="secondary" className="text-xs bg-yellow-500 text-white">
-                          <Clock className="w-3 h-3 mr-1" />
+                        <Badge variant="destructive" className="text-xs">
                           {group.pending_count} kutilmoqda
                         </Badge>
                       )}
@@ -495,6 +485,31 @@ export default function TeacherGroups() {
                   placeholder="Guruh haqida qisqacha ma'lumot"
                 />
               </div>
+              <div>
+                <label className="text-sm font-medium">Ustoz</label>
+                <Select
+                  value={newGroup.teacher_id}
+                  onValueChange={(value) =>
+                    setNewGroup({ ...newGroup, teacher_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ustoz tanlang" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teachers?.map((teacher) => (
+                      <SelectItem key={teacher.user_id} value={teacher.user_id}>
+                        {teacher.name} ({teacher.email})
+                      </SelectItem>
+                    ))}
+                    {teachers?.length === 0 && (
+                      <SelectItem value="none" disabled>
+                        Ustoz topilmadi
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -502,7 +517,7 @@ export default function TeacherGroups() {
               </Button>
               <Button
                 onClick={() => createGroup.mutate()}
-                disabled={!newGroup.name || createGroup.isPending}
+                disabled={!newGroup.name || !newGroup.teacher_id || createGroup.isPending}
               >
                 {createGroup.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -518,21 +533,17 @@ export default function TeacherGroups() {
           open={!!selectedGroup}
           onOpenChange={() => setSelectedGroup(null)}
         >
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between">
-                <span>{selectedGroup?.name}</span>
+                <div className="flex flex-col gap-1">
+                  <span>{selectedGroup?.name}</span>
+                  <span className="text-sm font-normal text-muted-foreground flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4" />
+                    Ustoz: {selectedGroup?.teacher_name}
+                  </span>
+                </div>
                 <div className="flex gap-2">
-                  {groupMembers && groupMembers.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={exportGroupToCSV}
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      CSV
-                    </Button>
-                  )}
                   <Button
                     size="sm"
                     onClick={() => setIsAddMemberOpen(true)}
@@ -553,14 +564,6 @@ export default function TeacherGroups() {
               </DialogTitle>
             </DialogHeader>
 
-            {/* Group Progress Stats */}
-            {groupMembers && groupMembers.length > 0 && (
-              <GroupProgressStats
-                groupId={selectedGroup?.id || ''}
-                memberUserIds={groupMembers.map((m) => m.user_id)}
-              />
-            )}
-
             {membersLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin" />
@@ -576,54 +579,38 @@ export default function TeacherGroups() {
                   <TableRow>
                     <TableHead>Ism</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead className="w-24 text-center">Holat</TableHead>
-                    <TableHead className="w-24 text-center">Progress</TableHead>
+                    <TableHead className="w-28 text-center">Holat</TableHead>
                     <TableHead className="w-32 text-center">Amallar</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {groupMembers?.map((member) => (
-                    <TableRow key={member.id} className={!member.is_approved ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}>
+                    <TableRow key={member.id}>
                       <TableCell>{member.name}</TableCell>
                       <TableCell>{member.email}</TableCell>
                       <TableCell className="text-center">
                         {member.is_approved ? (
-                          <Badge variant="default" className="bg-green-500 text-xs">
+                          <Badge variant="default" className="bg-green-500">
                             <UserCheck className="w-3 h-3 mr-1" />
                             Tasdiqlangan
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-yellow-500 text-white text-xs">
-                            <Clock className="w-3 h-3 mr-1" />
+                          <Badge variant="secondary" className="bg-yellow-500 text-white">
                             Kutilmoqda
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">
-                        {member.is_approved ? (
-                          <Badge 
-                            variant={member.progress >= 100 ? 'default' : member.progress >= 50 ? 'secondary' : 'outline'}
-                            className={member.progress >= 100 ? 'bg-green-500' : ''}
-                          >
-                            {member.progress}%
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 justify-center">
-                          {member.is_approved && (
+                          {!member.is_approved && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => {
-                                setSelectedStudent(member);
-                                setIsProgressOpen(true);
-                              }}
-                              title="Progressni ko'rish"
+                              onClick={() => approveMember.mutate(member.id)}
+                              title="Tasdiqlash"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
                             >
-                              <BarChart3 className="w-4 h-4 text-primary" />
+                              <Check className="w-4 h-4" />
                             </Button>
                           )}
                           <Button
@@ -706,7 +693,7 @@ export default function TeacherGroups() {
                 onClick={() => addMember.mutate()}
                 disabled={!selectedStudentId || addMember.isPending}
               >
-                Qo'shish
+                Qo'shish va tasdiqlash
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -739,6 +726,26 @@ export default function TeacherGroups() {
                   placeholder="Guruh haqida qisqacha ma'lumot"
                 />
               </div>
+              <div>
+                <label className="text-sm font-medium">Ustoz</label>
+                <Select
+                  value={editGroup.teacher_id}
+                  onValueChange={(value) =>
+                    setEditGroup({ ...editGroup, teacher_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ustoz tanlang" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teachers?.map((teacher) => (
+                      <SelectItem key={teacher.user_id} value={teacher.user_id}>
+                        {teacher.name} ({teacher.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>
@@ -746,7 +753,7 @@ export default function TeacherGroups() {
               </Button>
               <Button
                 onClick={() => updateGroup.mutate()}
-                disabled={!editGroup.name || updateGroup.isPending}
+                disabled={!editGroup.name || !editGroup.teacher_id || updateGroup.isPending}
               >
                 {updateGroup.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -756,13 +763,6 @@ export default function TeacherGroups() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Student Progress Dialog */}
-        <StudentProgressDialog
-          open={isProgressOpen}
-          onOpenChange={setIsProgressOpen}
-          student={selectedStudent}
-        />
       </div>
     </DashboardLayout>
   );
