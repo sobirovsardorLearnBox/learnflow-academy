@@ -212,11 +212,26 @@ function YouTubePlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
-      {/* YouTube Player Container */}
-      <div 
-        ref={playerContainerRef} 
-        className="absolute inset-0 w-full h-full pointer-events-none"
-      />
+      {/* YouTube Player Container - slightly scaled up to hide any YouTube UI elements at edges */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden">
+        <div 
+          ref={playerContainerRef} 
+          className="absolute pointer-events-none"
+          style={{
+            top: '-10%',
+            left: '-10%',
+            width: '120%',
+            height: '120%',
+          }}
+        />
+      </div>
+
+      {/* Cover any YouTube branding that might appear at top */}
+      <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/60 to-transparent z-10 pointer-events-none" />
+      
+      {/* Cover any YouTube branding that might appear at bottom corners */}
+      <div className="absolute bottom-16 right-0 w-32 h-12 bg-black/80 z-10 pointer-events-none rounded-tl-lg" />
+      <div className="absolute bottom-16 left-0 w-32 h-12 bg-black/80 z-10 pointer-events-none rounded-tr-lg" />
 
       {/* Clickable overlay */}
       <div 
