@@ -35,6 +35,8 @@ function YouTubePlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<any>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
+  const onCompleteRef = useRef(onComplete);
+  const hasCompletedRef = useRef(false);
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -43,6 +45,11 @@ function YouTubePlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const timeUpdateRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Keep onComplete ref updated
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const videoId = getYouTubeVideoId(videoUrl);
 
@@ -96,7 +103,10 @@ function YouTubePlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
               setIsPlaying(false);
             } else if (event.data === window.YT.PlayerState.ENDED) {
               setIsPlaying(false);
-              onComplete?.();
+              if (!hasCompletedRef.current) {
+                hasCompletedRef.current = true;
+                onCompleteRef.current?.();
+              }
             }
           },
         },
@@ -114,14 +124,22 @@ function YouTubePlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
         playerRef.current = null;
       }
     };
-  }, [videoId, onComplete]);
+  }, [videoId]);
 
-  // Update current time periodically
+  // Update current time periodically and check for 90% completion
   useEffect(() => {
     if (isPlaying && playerRef.current) {
       timeUpdateRef.current = setInterval(() => {
-        if (playerRef.current?.getCurrentTime) {
-          setCurrentTime(playerRef.current.getCurrentTime());
+        if (playerRef.current?.getCurrentTime && playerRef.current?.getDuration) {
+          const current = playerRef.current.getCurrentTime();
+          const total = playerRef.current.getDuration();
+          setCurrentTime(current);
+          
+          // Mark as complete when 90% of video is watched
+          if (total > 0 && current / total >= 0.9 && !hasCompletedRef.current) {
+            hasCompletedRef.current = true;
+            onCompleteRef.current?.();
+          }
         }
       }, 250);
     } else if (timeUpdateRef.current) {
