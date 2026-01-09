@@ -85,6 +85,45 @@ export type Database = {
           },
         ]
       }
+      group_units: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          group_id: string
+          id: string
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          group_id: string
+          id?: string
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          group_id?: string
+          id?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_units_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_units_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groups: {
         Row: {
           created_at: string
@@ -528,6 +567,14 @@ export type Database = {
       }
       is_teacher_of_group: {
         Args: { _group_id: string; _teacher_id: string }
+        Returns: boolean
+      }
+      user_has_lesson_access: {
+        Args: { _lesson_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_has_unit_access: {
+        Args: { _unit_id: string; _user_id: string }
         Returns: boolean
       }
     }

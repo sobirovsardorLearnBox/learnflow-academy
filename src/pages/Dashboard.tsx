@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, TrendingUp, Users, BookOpen, CreditCard, Code, Shield, Languages, Loader2, Trophy } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users, BookOpen, CreditCard, Code, Shield, Languages, Loader2, Trophy, Lock } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SectionCard } from '@/components/dashboard/SectionCard';
 import { LevelCard } from '@/components/dashboard/LevelCard';
@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSections, useLevels, useUnits, Section, Level } from '@/hooks/useSections';
 import { useUserStats, useUnitProgress } from '@/hooks/useLessons';
+import { useUserAccessibleUnits } from '@/hooks/useGroupUnits';
+import { toast } from 'sonner';
 
 const iconMap: Record<string, any> = {
   Code,
@@ -33,9 +35,13 @@ export default function Dashboard() {
   const { data: levels, isLoading: levelsLoading } = useLevels(selectedSection?.id);
   const { data: units, isLoading: unitsLoading } = useUnits(selectedLevel?.id);
   const { data: userStats } = useUserStats(user?.id);
+  const { data: accessibleUnitIds } = useUserAccessibleUnits(user?.id);
   
   const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
   const { data: unitProgress } = useUnitProgress(unitIds, user?.id);
+
+  // Check if user is student and needs unit access restrictions
+  const isStudent = user?.role === 'student';
 
   if (!user) {
     navigate('/');
@@ -96,17 +102,28 @@ export default function Dashboard() {
     const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
     const isCompleted = progress ? progress.completed === progress.total && progress.total > 0 : false;
     
+    // For students, check if unit is in their accessible list
+    const hasAccess = !isStudent || (accessibleUnitIds || []).includes(unit.id);
+    
     return {
       id: unit.id,
       levelId: unit.level_id,
       number: unit.unit_number,
       title: unit.name,
       isCompleted,
-      isLocked: false,
+      isLocked: !hasAccess,
       subUnits: progress ? [`${progress.completed}/${progress.total} lessons`] : ['No lessons'],
       progress: progressPercent,
     };
   });
+
+  const handleUnitClick = (unitId: string, isLocked: boolean) => {
+    if (isLocked) {
+      toast.error("Bu darsga kirish uchun guruhga qo'shilishingiz kerak");
+      return;
+    }
+    navigate(`/lesson/${unitId}`);
+  };
 
   return (
     <DashboardLayout>
@@ -238,7 +255,7 @@ export default function Dashboard() {
                 key={unit.id}
                 unit={unit}
                 index={index}
-                onClick={() => navigate(`/lesson/${unit.id}`)}
+                onClick={() => handleUnitClick(unit.id, unit.isLocked)}
               />
             ))}
           </div>
