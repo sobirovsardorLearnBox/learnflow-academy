@@ -30,10 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2, Download, Pencil, Search, Check, X, GraduationCap, UserCheck } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, Pencil, Search, Check, GraduationCap, UserCheck, BookOpen } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { format } from 'date-fns';
+import { useGroupUnits, useAddGroupUnit, useRemoveGroupUnit } from '@/hooks/useGroupUnits';
+import { useSections, useLevels, useUnits } from '@/hooks/useSections';
 
 interface Teacher {
   user_id: string;
@@ -69,12 +71,29 @@ export default function AdminGroups() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [newGroup, setNewGroup] = useState({ name: '', description: '', teacher_id: '' });
   const [editGroup, setEditGroup] = useState({ name: '', description: '', teacher_id: '' });
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('members');
+  
+  // Unit selection state
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [selectedLevelId, setSelectedLevelId] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+
+  // Group units hooks
+  const { data: groupUnits, isLoading: groupUnitsLoading } = useGroupUnits(selectedGroup?.id);
+  const addGroupUnit = useAddGroupUnit();
+  const removeGroupUnit = useRemoveGroupUnit();
+  
+  // Content hooks for unit selection
+  const { data: sections } = useSections();
+  const { data: levels } = useLevels(selectedSectionId || undefined);
+  const { data: allUnits } = useUnits(selectedLevelId || undefined);
 
   // Fetch teachers
   const { data: teachers } = useQuery({
@@ -531,9 +550,12 @@ export default function AdminGroups() {
         {/* Group Details Dialog */}
         <Dialog
           open={!!selectedGroup}
-          onOpenChange={() => setSelectedGroup(null)}
+          onOpenChange={() => {
+            setSelectedGroup(null);
+            setActiveTab('members');
+          }}
         >
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between">
                 <div className="flex flex-col gap-1">
@@ -543,91 +565,163 @@ export default function AdminGroups() {
                     Ustoz: {selectedGroup?.teacher_name}
                   </span>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => setIsAddMemberOpen(true)}
-                  >
-                    <UserPlus className="w-4 h-4 mr-1" />
-                    Talaba qo'shish
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      if (selectedGroup) deleteGroup.mutate(selectedGroup.id);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    if (selectedGroup) deleteGroup.mutate(selectedGroup.id);
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </DialogTitle>
             </DialogHeader>
 
-            {membersLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : groupMembers?.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Bu guruhda hali talaba yo'q</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ism</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead className="w-28 text-center">Holat</TableHead>
-                    <TableHead className="w-32 text-center">Amallar</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groupMembers?.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell>{member.name}</TableCell>
-                      <TableCell>{member.email}</TableCell>
-                      <TableCell className="text-center">
-                        {member.is_approved ? (
-                          <Badge variant="default" className="bg-green-500">
-                            <UserCheck className="w-3 h-3 mr-1" />
-                            Tasdiqlangan
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-yellow-500 text-white">
-                            Kutilmoqda
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 justify-center">
-                          {!member.is_approved && (
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="members" className="gap-2">
+                  <Users className="w-4 h-4" />
+                  Talabalar ({groupMembers?.length || 0})
+                </TabsTrigger>
+                <TabsTrigger value="units" className="gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  Darslar ({groupUnits?.length || 0})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="members" className="mt-4">
+                <div className="flex justify-end mb-4">
+                  <Button size="sm" onClick={() => setIsAddMemberOpen(true)}>
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Talaba qo'shish
+                  </Button>
+                </div>
+
+                {membersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : groupMembers?.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Bu guruhda hali talaba yo'q</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ism</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead className="w-28 text-center">Holat</TableHead>
+                        <TableHead className="w-32 text-center">Amallar</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupMembers?.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell>{member.name}</TableCell>
+                          <TableCell>{member.email}</TableCell>
+                          <TableCell className="text-center">
+                            {member.is_approved ? (
+                              <Badge variant="default" className="bg-green-500">
+                                <UserCheck className="w-3 h-3 mr-1" />
+                                Tasdiqlangan
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-yellow-500 text-white">
+                                Kutilmoqda
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 justify-center">
+                              {!member.is_approved && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => approveMember.mutate(member.id)}
+                                  title="Tasdiqlash"
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removeMember.mutate(member.id)}
+                                title="O'chirish"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+
+              <TabsContent value="units" className="mt-4">
+                <div className="flex justify-end mb-4">
+                  <Button size="sm" onClick={() => setIsAddUnitOpen(true)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Dars qo'shish
+                  </Button>
+                </div>
+
+                {groupUnitsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : groupUnits?.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Bu guruhga hali dars biriktirilmagan</p>
+                    <p className="text-sm mt-2">Dars qo'shib, talabalar uchun ochiq qiling</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Bo'lim</TableHead>
+                        <TableHead>Daraja</TableHead>
+                        <TableHead>Dars nomi</TableHead>
+                        <TableHead className="w-20 text-center">Amallar</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupUnits?.map((gu) => (
+                        <TableRow key={gu.id}>
+                          <TableCell>{gu.unit?.level?.section?.name || '-'}</TableCell>
+                          <TableCell>{gu.unit?.level?.name || '-'}</TableCell>
+                          <TableCell>{gu.unit?.name || '-'}</TableCell>
+                          <TableCell className="text-center">
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => approveMember.mutate(member.id)}
-                              title="Tasdiqlash"
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => {
+                                if (selectedGroup) {
+                                  removeGroupUnit.mutate({
+                                    groupId: selectedGroup.id,
+                                    unitId: gu.unit_id,
+                                  });
+                                  toast.success("Dars olib tashlandi");
+                                }
+                              }}
+                              title="O'chirish"
                             >
-                              <Check className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4 text-destructive" />
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeMember.mutate(member.id)}
-                            title="O'chirish"
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
 
@@ -759,6 +853,128 @@ export default function AdminGroups() {
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : null}
                 Saqlash
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Unit Dialog */}
+        <Dialog open={isAddUnitOpen} onOpenChange={(open) => {
+          setIsAddUnitOpen(open);
+          if (!open) {
+            setSelectedSectionId('');
+            setSelectedLevelId('');
+            setSelectedUnitId('');
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Dars qo'shish</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Bo'limni tanlang</label>
+                <Select
+                  value={selectedSectionId}
+                  onValueChange={(value) => {
+                    setSelectedSectionId(value);
+                    setSelectedLevelId('');
+                    setSelectedUnitId('');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Bo'lim tanlang" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sections?.map((section) => (
+                      <SelectItem key={section.id} value={section.id}>
+                        {section.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedSectionId && (
+                <div>
+                  <label className="text-sm font-medium">Darajani tanlang</label>
+                  <Select
+                    value={selectedLevelId}
+                    onValueChange={(value) => {
+                      setSelectedLevelId(value);
+                      setSelectedUnitId('');
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Daraja tanlang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {levels?.map((level) => (
+                        <SelectItem key={level.id} value={level.id}>
+                          {level.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {selectedLevelId && (
+                <div>
+                  <label className="text-sm font-medium">Darsni tanlang</label>
+                  <Select
+                    value={selectedUnitId}
+                    onValueChange={setSelectedUnitId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Dars tanlang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allUnits
+                        ?.filter(u => !groupUnits?.some(gu => gu.unit_id === u.id))
+                        .map((unit) => (
+                          <SelectItem key={unit.id} value={unit.id}>
+                            {unit.name}
+                          </SelectItem>
+                        ))}
+                      {allUnits?.filter(u => !groupUnits?.some(gu => gu.unit_id === u.id)).length === 0 && (
+                        <SelectItem value="none" disabled>
+                          Qo'shish uchun dars yo'q
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsAddUnitOpen(false)}
+              >
+                Bekor qilish
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedGroup && selectedUnitId) {
+                    addGroupUnit.mutate({
+                      groupId: selectedGroup.id,
+                      unitId: selectedUnitId,
+                      createdBy: user?.id,
+                    });
+                    setIsAddUnitOpen(false);
+                    setSelectedSectionId('');
+                    setSelectedLevelId('');
+                    setSelectedUnitId('');
+                    toast.success("Dars qo'shildi");
+                  }
+                }}
+                disabled={!selectedUnitId || addGroupUnit.isPending}
+              >
+                {addGroupUnit.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Qo'shish
               </Button>
             </DialogFooter>
           </DialogContent>
