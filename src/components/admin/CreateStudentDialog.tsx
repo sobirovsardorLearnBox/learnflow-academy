@@ -10,33 +10,31 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+import { useAuth } from '@/contexts/AuthContext';
 
 const userSchema = z.object({
   name: z.string().min(2, 'Ism kamida 2 belgidan iborat bo\'lishi kerak'),
   email: z.string().email('To\'g\'ri email kiriting'),
   password: z.string().min(6, 'Parol kamida 6 belgidan iborat bo\'lishi kerak'),
-  role: z.enum(['admin', 'teacher']),
 });
 
-export function CreateUserDialog() {
-  const [open, setOpen] = useState(false);
+interface CreateStudentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  groupId: string;
+  groupName: string;
+}
+
+export function CreateStudentDialog({ open, onOpenChange, groupId, groupName }: CreateStudentDialogProps) {
+  const { user } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'admin' | 'teacher'>('teacher');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,7 +46,6 @@ export function CreateUserDialog() {
     setName('');
     setEmail('');
     setPassword('');
-    setRole('teacher');
     setError('');
   };
 
@@ -57,7 +54,7 @@ export function CreateUserDialog() {
     setError('');
 
     // Validate input
-    const validation = userSchema.safeParse({ name, email, password, role });
+    const validation = userSchema.safeParse({ name, email, password });
     if (!validation.success) {
       setError(validation.error.errors[0].message);
       return;
@@ -69,16 +66,17 @@ export function CreateUserDialog() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        setError('You must be logged in to create users');
+        setError('Tizimga kirish kerak');
         return;
       }
 
+      // Create user with student role
       const response = await supabase.functions.invoke('create-user', {
-        body: { email, password, name, role },
+        body: { email, password, name, role: 'student' },
       });
 
       if (response.error) {
-        setError(response.error.message || 'Failed to create user');
+        setError(response.error.message || 'Foydalanuvchi yaratishda xatolik');
         return;
       }
 
@@ -87,20 +85,45 @@ export function CreateUserDialog() {
         return;
       }
 
-      toast({
-        title: 'User created!',
-        description: `${name} has been added as a ${role}.`,
-      });
+      const newUserId = response.data?.user?.id;
 
-      // Refresh the users list
+      if (newUserId) {
+        // Add student to the group as approved member
+        const { error: memberError } = await supabase.from('group_members').insert({
+          group_id: groupId,
+          user_id: newUserId,
+          is_approved: true,
+          approved_at: new Date().toISOString(),
+          approved_by: user?.id,
+        });
+
+        if (memberError) {
+          console.error('Error adding student to group:', memberError);
+          // User created but not added to group
+          toast({
+            title: 'Talaba yaratildi',
+            description: `${name} yaratildi, lekin guruhga qo'shishda xatolik yuz berdi.`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Talaba yaratildi!',
+            description: `${name} "${groupName}" guruhiga qo'shildi.`,
+          });
+        }
+      }
+
+      // Refresh queries
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-group-members'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
       
       // Close dialog and reset form
-      setOpen(false);
+      onOpenChange(false);
       resetForm();
     } catch (err) {
-      setError('An error occurred. Please try again.');
-      console.error('Create user error:', err);
+      setError('Xatolik yuz berdi. Qaytadan urinib ko\'ring.');
+      console.error('Create student error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -108,20 +131,14 @@ export function CreateUserDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
-      setOpen(isOpen);
+      onOpenChange(isOpen);
       if (!isOpen) resetForm();
     }}>
-      <DialogTrigger asChild>
-        <Button variant="premium">
-          <UserPlus className="w-4 h-4 mr-2" />
-          Ustoz/Admin qo'shish
-        </Button>
-      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Yangi foydalanuvchi yaratish</DialogTitle>
+          <DialogTitle>Yangi talaba yaratish</DialogTitle>
           <DialogDescription>
-            Platformaga yangi ustoz yoki admin qo'shing. Talabalar guruh ichida yaratiladi.
+            "{groupName}" guruhiga yangi talaba qo'shing.
           </DialogDescription>
         </DialogHeader>
 
@@ -138,9 +155,9 @@ export function CreateUserDialog() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="user-name">To'liq ism</Label>
+            <Label htmlFor="student-name">To'liq ism</Label>
             <Input
-              id="user-name"
+              id="student-name"
               type="text"
               placeholder="Ism Familiya"
               value={name}
@@ -150,11 +167,11 @@ export function CreateUserDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="user-email">Email</Label>
+            <Label htmlFor="student-email">Email</Label>
             <Input
-              id="user-email"
+              id="student-email"
               type="email"
-              placeholder="user@example.com"
+              placeholder="talaba@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -162,11 +179,10 @@ export function CreateUserDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="user-password">Parol</Label>
-            <Label htmlFor="user-password">Password</Label>
+            <Label htmlFor="student-password">Parol</Label>
             <div className="relative">
               <Input
-                id="user-password"
+                id="student-password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
@@ -184,24 +200,11 @@ export function CreateUserDialog() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="user-role">Rol</Label>
-            <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
-              <SelectTrigger id="user-role">
-                <SelectValue placeholder="Rol tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="teacher">O'qituvchi</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="flex gap-3 justify-end pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setOpen(false)}
+              onClick={() => onOpenChange(false)}
               disabled={isLoading}
             >
               Bekor qilish
