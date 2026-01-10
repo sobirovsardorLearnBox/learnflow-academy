@@ -31,10 +31,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download, Pencil, Search, Clock, UserCheck } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download, Pencil, Search, Clock, UserCheck, UserRoundPlus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
 import { GroupProgressStats } from '@/components/teacher/GroupProgressStats';
+import { CreateStudentDialog } from '@/components/admin/CreateStudentDialog';
 import { format } from 'date-fns';
 
 interface Group {
@@ -64,6 +65,7 @@ export default function TeacherGroups() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isProgressOpen, setIsProgressOpen] = useState(false);
+  const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -533,13 +535,21 @@ export default function TeacherGroups() {
                       CSV
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    onClick={() => setIsAddMemberOpen(true)}
-                  >
-                    <UserPlus className="w-4 h-4 mr-1" />
-                    Talaba qo'shish
-                  </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsCreateStudentOpen(true)}
+                    >
+                      <UserRoundPlus className="w-4 h-4 mr-1" />
+                      Yangi talaba
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsAddMemberOpen(true)}
+                    >
+                      <UserPlus className="w-4 h-4 mr-1" />
+                      Mavjud talaba
+                    </Button>
                   <Button
                     size="sm"
                     variant="destructive"
@@ -763,6 +773,16 @@ export default function TeacherGroups() {
           onOpenChange={setIsProgressOpen}
           student={selectedStudent}
         />
+
+        {/* Create Student Dialog */}
+        {selectedGroup && (
+          <CreateStudentDialog
+            open={isCreateStudentOpen}
+            onOpenChange={setIsCreateStudentOpen}
+            groupId={selectedGroup.id}
+            groupName={selectedGroup.name}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
