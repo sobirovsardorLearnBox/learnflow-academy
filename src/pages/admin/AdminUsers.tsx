@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, MoreVertical, Mail, Shield, Trash2, Loader2 } from 'lucide-react';
+import { Search, MoreVertical, Shield, Trash2, Loader2, Users } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PaymentStatusBadge } from '@/components/dashboard/PaymentBanner';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,8 @@ import { cn } from '@/lib/utils';
 import { useAdminUsers, useUpdateUserRole, useDeleteUser } from '@/hooks/useAdminData';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,6 +46,37 @@ export default function AdminUsers() {
   const updateRole = useUpdateUserRole();
   const deleteUser = useDeleteUser();
 
+  // Fetch user groups - which groups each student belongs to
+  const { data: userGroups } = useQuery({
+    queryKey: ['user-groups-mapping'],
+    queryFn: async () => {
+      // Get all group memberships with group info
+      const { data: memberships, error } = await supabase
+        .from('group_members')
+        .select(`
+          user_id,
+          is_approved,
+          group:groups(id, name)
+        `)
+        .eq('is_approved', true);
+
+      if (error) throw error;
+
+      // Create a map of user_id to group names
+      const groupMap: Record<string, string[]> = {};
+      memberships?.forEach((m) => {
+        if (m.group && m.group.name) {
+          if (!groupMap[m.user_id]) {
+            groupMap[m.user_id] = [];
+          }
+          groupMap[m.user_id].push(m.group.name);
+        }
+      });
+      return groupMap;
+    },
+  });
+
+  // Filter users - exclude students from the main list (they're managed in groups)
   const filteredUsers = (users || []).filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -180,6 +214,7 @@ export default function AdminUsers() {
                     <tr className="border-b border-border">
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Foydalanuvchi</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Rol</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Guruh</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">To'lov</th>
                       <th className="text-right p-4 text-sm font-medium text-muted-foreground">Amallar</th>
                     </tr>
@@ -215,6 +250,22 @@ export default function AdminUsers() {
                             {user.role === 'teacher' && "O'qituvchi"}
                             {user.role === 'student' && 'Talaba'}
                           </span>
+                        </td>
+                        <td className="p-4">
+                          {user.role === 'student' && userGroups?.[user.user_id] ? (
+                            <div className="flex flex-wrap gap-1">
+                              {userGroups[user.user_id].map((groupName, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  <Users className="w-3 h-3 mr-1" />
+                                  {groupName}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : user.role === 'student' ? (
+                            <span className="text-muted-foreground text-sm">Guruhsiz</span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
                         </td>
                         <td className="p-4">
                           <PaymentStatusBadge status={user.paymentStatus} />

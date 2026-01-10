@@ -32,10 +32,11 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2, Pencil, Search, Check, GraduationCap, UserCheck, BookOpen } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, Pencil, Search, Check, GraduationCap, UserCheck, BookOpen, UserRoundPlus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useGroupUnits, useAddGroupUnit, useRemoveGroupUnit } from '@/hooks/useGroupUnits';
 import { useSections, useLevels, useUnits } from '@/hooks/useSections';
+import { CreateStudentDialog } from '@/components/admin/CreateStudentDialog';
 
 interface Teacher {
   user_id: string;
@@ -72,6 +73,7 @@ export default function AdminGroups() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
+  const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [newGroup, setNewGroup] = useState({ name: '', description: '', teacher_id: '' });
@@ -590,10 +592,14 @@ export default function AdminGroups() {
               </TabsList>
 
               <TabsContent value="members" className="mt-4">
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-end gap-2 mb-4">
+                  <Button size="sm" variant="outline" onClick={() => setIsCreateStudentOpen(true)}>
+                    <UserRoundPlus className="w-4 h-4 mr-1" />
+                    Yangi talaba yaratish
+                  </Button>
                   <Button size="sm" onClick={() => setIsAddMemberOpen(true)}>
                     <UserPlus className="w-4 h-4 mr-1" />
-                    Talaba qo'shish
+                    Mavjud talaba qo'shish
                   </Button>
                 </div>
 
@@ -979,6 +985,16 @@ export default function AdminGroups() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Create Student Dialog */}
+        {selectedGroup && (
+          <CreateStudentDialog
+            open={isCreateStudentOpen}
+            onOpenChange={setIsCreateStudentOpen}
+            groupId={selectedGroup.id}
+            groupName={selectedGroup.name}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
