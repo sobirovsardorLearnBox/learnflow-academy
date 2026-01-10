@@ -30,12 +30,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download, Pencil, Search, Clock, UserCheck, UserRoundPlus } from 'lucide-react';
+import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download, Pencil, Search, Clock, UserCheck, UserRoundPlus, BookOpen, Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
 import { GroupProgressStats } from '@/components/teacher/GroupProgressStats';
 import { CreateStudentDialog } from '@/components/admin/CreateStudentDialog';
+import { useGroupUnits, useAddGroupUnit, useRemoveGroupUnit } from '@/hooks/useGroupUnits';
+import { useSections, useLevels, useUnits } from '@/hooks/useSections';
 import { format } from 'date-fns';
 
 interface Group {
@@ -66,6 +69,8 @@ export default function TeacherGroups() {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isProgressOpen, setIsProgressOpen] = useState(false);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('members');
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -73,6 +78,21 @@ export default function TeacherGroups() {
   const [editGroup, setEditGroup] = useState({ name: '', description: '' });
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  
+  // Unit selection state
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [selectedLevelId, setSelectedLevelId] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+
+  // Group units hooks
+  const { data: groupUnits, isLoading: groupUnitsLoading } = useGroupUnits(selectedGroup?.id);
+  const addGroupUnit = useAddGroupUnit();
+  const removeGroupUnit = useRemoveGroupUnit();
+  
+  // Content hooks for unit selection
+  const { data: sections } = useSections();
+  const { data: levels } = useLevels(selectedSectionId || undefined);
+  const { data: allUnits } = useUnits(selectedLevelId || undefined);
 
   // Fetch groups with teacher info
   const { data: groups, isLoading: groupsLoading } = useQuery({
@@ -280,14 +300,16 @@ export default function TeacherGroups() {
     onError: () => toast.error("Guruhni o'chirishda xatolik"),
   });
 
-  // Add member mutation (pending admin approval)
+  // Add member mutation (teacher can add and approve directly)
   const addMember = useMutation({
     mutationFn: async () => {
       if (!selectedGroup || !selectedStudentId) return;
       const { error } = await supabase.from('group_members').insert({
         group_id: selectedGroup.id,
         user_id: selectedStudentId,
-        is_approved: false, // Pending admin approval
+        is_approved: true,
+        approved_at: new Date().toISOString(),
+        approved_by: user?.id,
       });
       if (error) throw error;
     },
@@ -297,9 +319,30 @@ export default function TeacherGroups() {
       queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
       setIsAddMemberOpen(false);
       setSelectedStudentId('');
-      toast.success("Talaba qo'shildi - admin tasdiqlashini kutmoqda");
+      toast.success("Talaba qo'shildi va tasdiqlandi");
     },
     onError: () => toast.error("Talabani qo'shishda xatolik"),
+  });
+
+  // Approve member mutation
+  const approveMember = useMutation({
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from('group_members')
+        .update({
+          is_approved: true,
+          approved_at: new Date().toISOString(),
+          approved_by: user?.id,
+        })
+        .eq('id', memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['group-members'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      toast.success("Talaba tasdiqlandi");
+    },
+    onError: () => toast.error("Talabani tasdiqlashda xatolik"),
   });
 
   // Remove member mutation
@@ -518,9 +561,12 @@ export default function TeacherGroups() {
         {/* Group Details Dialog */}
         <Dialog
           open={!!selectedGroup}
-          onOpenChange={() => setSelectedGroup(null)}
+          onOpenChange={() => {
+            setSelectedGroup(null);
+            setActiveTab('members');
+          }}
         >
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center justify-between">
                 <span>{selectedGroup?.name}</span>
@@ -535,21 +581,6 @@ export default function TeacherGroups() {
                       CSV
                     </Button>
                   )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsCreateStudentOpen(true)}
-                    >
-                      <UserRoundPlus className="w-4 h-4 mr-1" />
-                      Yangi talaba
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setIsAddMemberOpen(true)}
-                    >
-                      <UserPlus className="w-4 h-4 mr-1" />
-                      Mavjud talaba
-                    </Button>
                   <Button
                     size="sm"
                     variant="destructive"
@@ -563,94 +594,190 @@ export default function TeacherGroups() {
               </DialogTitle>
             </DialogHeader>
 
-            {/* Group Progress Stats */}
-            {groupMembers && groupMembers.length > 0 && (
-              <GroupProgressStats
-                groupId={selectedGroup?.id || ''}
-                memberUserIds={groupMembers.map((m) => m.user_id)}
-              />
-            )}
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="members" className="gap-2">
+                  <Users className="w-4 h-4" />
+                  Talabalar ({groupMembers?.filter(m => m.is_approved).length || 0})
+                </TabsTrigger>
+                <TabsTrigger value="units" className="gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  Darslar ({groupUnits?.length || 0})
+                </TabsTrigger>
+              </TabsList>
 
-            {membersLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : groupMembers?.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>Bu guruhda hali talaba yo'q</p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ism</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead className="w-24 text-center">Holat</TableHead>
-                    <TableHead className="w-24 text-center">Progress</TableHead>
-                    <TableHead className="w-32 text-center">Amallar</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groupMembers?.map((member) => (
-                    <TableRow key={member.id} className={!member.is_approved ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}>
-                      <TableCell>{member.name}</TableCell>
-                      <TableCell>{member.email}</TableCell>
-                      <TableCell className="text-center">
-                        {member.is_approved ? (
-                          <Badge variant="default" className="bg-green-500 text-xs">
-                            <UserCheck className="w-3 h-3 mr-1" />
-                            Tasdiqlangan
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-yellow-500 text-white text-xs">
-                            <Clock className="w-3 h-3 mr-1" />
-                            Kutilmoqda
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {member.is_approved ? (
-                          <Badge 
-                            variant={member.progress >= 100 ? 'default' : member.progress >= 50 ? 'secondary' : 'outline'}
-                            className={member.progress >= 100 ? 'bg-green-500' : ''}
-                          >
-                            {member.progress}%
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 justify-center">
-                          {member.is_approved && (
+              <TabsContent value="members" className="mt-4">
+                {/* Group Progress Stats */}
+                {groupMembers && groupMembers.filter(m => m.is_approved).length > 0 && (
+                  <GroupProgressStats
+                    groupId={selectedGroup?.id || ''}
+                    memberUserIds={groupMembers.filter(m => m.is_approved).map((m) => m.user_id)}
+                  />
+                )}
+
+                <div className="flex justify-end gap-2 mb-4">
+                  <Button size="sm" variant="outline" onClick={() => setIsCreateStudentOpen(true)}>
+                    <UserRoundPlus className="w-4 h-4 mr-1" />
+                    Yangi talaba
+                  </Button>
+                  <Button size="sm" onClick={() => setIsAddMemberOpen(true)}>
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Mavjud talaba
+                  </Button>
+                </div>
+
+                {membersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : groupMembers?.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Bu guruhda hali talaba yo'q</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Ism</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead className="w-24 text-center">Holat</TableHead>
+                        <TableHead className="w-24 text-center">Progress</TableHead>
+                        <TableHead className="w-32 text-center">Amallar</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupMembers?.map((member) => (
+                        <TableRow key={member.id} className={!member.is_approved ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}>
+                          <TableCell>{member.name}</TableCell>
+                          <TableCell>{member.email}</TableCell>
+                          <TableCell className="text-center">
+                            {member.is_approved ? (
+                              <Badge variant="default" className="bg-green-500 text-xs">
+                                <UserCheck className="w-3 h-3 mr-1" />
+                                Tasdiqlangan
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-yellow-500 text-white text-xs">
+                                <Clock className="w-3 h-3 mr-1" />
+                                Kutilmoqda
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {member.is_approved ? (
+                              <Badge 
+                                variant={member.progress >= 100 ? 'default' : member.progress >= 50 ? 'secondary' : 'outline'}
+                                className={member.progress >= 100 ? 'bg-green-500' : ''}
+                              >
+                                {member.progress}%
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 justify-center">
+                              {!member.is_approved && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => approveMember.mutate(member.id)}
+                                  title="Tasdiqlash"
+                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {member.is_approved && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setSelectedStudent(member);
+                                    setIsProgressOpen(true);
+                                  }}
+                                  title="Progressni ko'rish"
+                                >
+                                  <BarChart3 className="w-4 h-4 text-primary" />
+                                </Button>
+                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removeMember.mutate(member.id)}
+                                title="O'chirish"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+
+              <TabsContent value="units" className="mt-4">
+                <div className="flex justify-end mb-4">
+                  <Button size="sm" onClick={() => setIsAddUnitOpen(true)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Dars qo'shish
+                  </Button>
+                </div>
+
+                {groupUnitsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : groupUnits?.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Bu guruhga hali dars biriktirilmagan</p>
+                    <p className="text-sm mt-2">Dars qo'shib, talabalar uchun ochiq qiling</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Bo'lim</TableHead>
+                        <TableHead>Daraja</TableHead>
+                        <TableHead>Dars nomi</TableHead>
+                        <TableHead className="w-20 text-center">Amallar</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupUnits?.map((gu) => (
+                        <TableRow key={gu.id}>
+                          <TableCell>{gu.unit?.level?.section?.name || '-'}</TableCell>
+                          <TableCell>{gu.unit?.level?.name || '-'}</TableCell>
+                          <TableCell>{gu.unit?.name || '-'}</TableCell>
+                          <TableCell className="text-center">
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => {
-                                setSelectedStudent(member);
-                                setIsProgressOpen(true);
+                                if (selectedGroup) {
+                                  removeGroupUnit.mutate({
+                                    groupId: selectedGroup.id,
+                                    unitId: gu.unit_id,
+                                  });
+                                  toast.success("Dars olib tashlandi");
+                                }
                               }}
-                              title="Progressni ko'rish"
+                              title="O'chirish"
                             >
-                              <BarChart3 className="w-4 h-4 text-primary" />
+                              <Trash2 className="w-4 h-4 text-destructive" />
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeMember.mutate(member.id)}
-                            title="O'chirish"
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
 
@@ -762,6 +889,124 @@ export default function TeacherGroups() {
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : null}
                 Saqlash
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Unit Dialog */}
+        <Dialog open={isAddUnitOpen} onOpenChange={(open) => {
+          setIsAddUnitOpen(open);
+          if (!open) {
+            setSelectedSectionId('');
+            setSelectedLevelId('');
+            setSelectedUnitId('');
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Dars qo'shish</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Bo'limni tanlang</label>
+                <Select
+                  value={selectedSectionId}
+                  onValueChange={(value) => {
+                    setSelectedSectionId(value);
+                    setSelectedLevelId('');
+                    setSelectedUnitId('');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Bo'lim tanlang" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sections?.map((section) => (
+                      <SelectItem key={section.id} value={section.id}>
+                        {section.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedSectionId && (
+                <div>
+                  <label className="text-sm font-medium">Darajani tanlang</label>
+                  <Select
+                    value={selectedLevelId}
+                    onValueChange={(value) => {
+                      setSelectedLevelId(value);
+                      setSelectedUnitId('');
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Daraja tanlang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {levels?.map((level) => (
+                        <SelectItem key={level.id} value={level.id}>
+                          {level.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {selectedLevelId && (
+                <div>
+                  <label className="text-sm font-medium">Darsni tanlang</label>
+                  <Select
+                    value={selectedUnitId}
+                    onValueChange={setSelectedUnitId}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Dars tanlang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allUnits
+                        ?.filter((unit) => !groupUnits?.some((gu) => gu.unit_id === unit.id))
+                        .map((unit) => (
+                          <SelectItem key={unit.id} value={unit.id}>
+                            {unit.name}
+                          </SelectItem>
+                        ))}
+                      {allUnits?.filter((unit) => !groupUnits?.some((gu) => gu.unit_id === unit.id)).length === 0 && (
+                        <SelectItem value="none" disabled>
+                          Barcha darslar allaqachon qo'shilgan
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddUnitOpen(false)}>
+                Bekor qilish
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedGroup && selectedUnitId) {
+                    addGroupUnit.mutate({
+                      groupId: selectedGroup.id,
+                      unitId: selectedUnitId,
+                    });
+                    setIsAddUnitOpen(false);
+                    setSelectedSectionId('');
+                    setSelectedLevelId('');
+                    setSelectedUnitId('');
+                    toast.success("Dars qo'shildi");
+                  }
+                }}
+                disabled={!selectedUnitId || addGroupUnit.isPending}
+              >
+                {addGroupUnit.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Qo'shish
               </Button>
             </DialogFooter>
           </DialogContent>
