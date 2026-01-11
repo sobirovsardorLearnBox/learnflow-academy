@@ -96,12 +96,12 @@ export default function TeacherGroups() {
 
   // Fetch groups with teacher info
   const { data: groups, isLoading: groupsLoading } = useQuery({
-    queryKey: ['teacher-groups', user?.id],
+    queryKey: ['teacher-groups', user?.user_id],
     queryFn: async () => {
       const { data: groupsData, error } = await supabase
         .from('groups')
         .select('*')
-        .eq('teacher_id', user?.id)
+        .eq('teacher_id', user?.user_id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -131,7 +131,7 @@ export default function TeacherGroups() {
 
       return groupsWithCounts as Group[];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.user_id,
   });
 
   // Fetch group members with progress (only approved members shown, pending visible separately)
@@ -232,7 +232,7 @@ export default function TeacherGroups() {
       const { error } = await supabase.from('groups').insert({
         name: newGroup.name,
         description: newGroup.description || null,
-        teacher_id: user?.id,
+        teacher_id: user?.user_id,
       });
       if (error) throw error;
     },
@@ -309,7 +309,7 @@ export default function TeacherGroups() {
         user_id: selectedStudentId,
         is_approved: true,
         approved_at: new Date().toISOString(),
-        approved_by: user?.id,
+        approved_by: user?.user_id,
       });
       if (error) throw error;
     },
@@ -332,7 +332,7 @@ export default function TeacherGroups() {
         .update({
           is_approved: true,
           approved_at: new Date().toISOString(),
-          approved_by: user?.id,
+          approved_by: user?.user_id,
         })
         .eq('id', memberId);
       if (error) throw error;
