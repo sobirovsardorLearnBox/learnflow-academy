@@ -34,8 +34,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Plus, Users, Trash2, UserPlus, Loader2, Pencil, Search, Check, GraduationCap, UserCheck, BookOpen, UserRoundPlus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { useGroupUnits, useAddGroupUnit, useRemoveGroupUnit } from '@/hooks/useGroupUnits';
-import { useSections, useLevels, useUnits } from '@/hooks/useSections';
+import { useGroupSections, useAddGroupSection, useRemoveGroupSection } from '@/hooks/useGroupSections';
+import { useSections } from '@/hooks/useSections';
 import { CreateStudentDialog } from '@/components/admin/CreateStudentDialog';
 
 interface Teacher {
@@ -72,7 +72,7 @@ export default function AdminGroups() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
+  const [isAddSectionOpen, setIsAddSectionOpen] = useState(false);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -82,20 +82,16 @@ export default function AdminGroups() {
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('members');
   
-  // Unit selection state
+  // Section selection state
   const [selectedSectionId, setSelectedSectionId] = useState('');
-  const [selectedLevelId, setSelectedLevelId] = useState('');
-  const [selectedUnitId, setSelectedUnitId] = useState('');
 
-  // Group units hooks
-  const { data: groupUnits, isLoading: groupUnitsLoading } = useGroupUnits(selectedGroup?.id);
-  const addGroupUnit = useAddGroupUnit();
-  const removeGroupUnit = useRemoveGroupUnit();
+  // Group sections hooks
+  const { data: groupSections, isLoading: groupSectionsLoading } = useGroupSections(selectedGroup?.id);
+  const addGroupSection = useAddGroupSection();
+  const removeGroupSection = useRemoveGroupSection();
   
-  // Content hooks for unit selection
+  // Content hooks for section selection
   const { data: sections } = useSections();
-  const { data: levels } = useLevels(selectedSectionId || undefined);
-  const { data: allUnits } = useUnits(selectedLevelId || undefined);
 
   // Fetch teachers
   const { data: teachers } = useQuery({
@@ -373,6 +369,11 @@ export default function AdminGroups() {
     onError: () => toast.error("Talabani olib tashlashda xatolik"),
   });
 
+  // Get available sections (not yet added to this group)
+  const availableSections = sections?.filter(
+    (section) => !groupSections?.some((gs) => gs.section_id === section.id)
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -585,9 +586,9 @@ export default function AdminGroups() {
                   <Users className="w-4 h-4" />
                   Talabalar ({groupMembers?.length || 0})
                 </TabsTrigger>
-                <TabsTrigger value="units" className="gap-2">
+                <TabsTrigger value="sections" className="gap-2">
                   <BookOpen className="w-4 h-4" />
-                  Darslar ({groupUnits?.length || 0})
+                  Bo'limlar ({groupSections?.length || 0})
                 </TabsTrigger>
               </TabsList>
 
@@ -669,51 +670,49 @@ export default function AdminGroups() {
                 )}
               </TabsContent>
 
-              <TabsContent value="units" className="mt-4">
+              <TabsContent value="sections" className="mt-4">
                 <div className="flex justify-end mb-4">
-                  <Button size="sm" onClick={() => setIsAddUnitOpen(true)}>
+                  <Button size="sm" onClick={() => setIsAddSectionOpen(true)}>
                     <Plus className="w-4 h-4 mr-1" />
-                    Dars qo'shish
+                    Bo'lim qo'shish
                   </Button>
                 </div>
 
-                {groupUnitsLoading ? (
+                {groupSectionsLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin" />
                   </div>
-                ) : groupUnits?.length === 0 ? (
+                ) : groupSections?.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <BookOpen className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Bu guruhga hali dars biriktirilmagan</p>
-                    <p className="text-sm mt-2">Dars qo'shib, talabalar uchun ochiq qiling</p>
+                    <p>Bu guruhga hali bo'lim biriktirilmagan</p>
+                    <p className="text-sm mt-2">Bo'lim qo'shib, talabalar uchun barcha darslarni ochiq qiling</p>
                   </div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Bo'lim</TableHead>
-                        <TableHead>Daraja</TableHead>
-                        <TableHead>Dars nomi</TableHead>
+                        <TableHead>Bo'lim nomi</TableHead>
+                        <TableHead>Tavsif</TableHead>
                         <TableHead className="w-20 text-center">Amallar</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {groupUnits?.map((gu) => (
-                        <TableRow key={gu.id}>
-                          <TableCell>{gu.unit?.level?.section?.name || '-'}</TableCell>
-                          <TableCell>{gu.unit?.level?.name || '-'}</TableCell>
-                          <TableCell>{gu.unit?.name || '-'}</TableCell>
+                      {groupSections?.map((gs) => (
+                        <TableRow key={gs.id}>
+                          <TableCell className="font-medium">{gs.section?.name || '-'}</TableCell>
+                          <TableCell className="text-muted-foreground">{gs.section?.description || '-'}</TableCell>
                           <TableCell className="text-center">
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => {
                                 if (selectedGroup) {
-                                  removeGroupUnit.mutate({
+                                  removeGroupSection.mutate({
                                     groupId: selectedGroup.id,
-                                    unitId: gu.unit_id,
+                                    sectionId: gs.section_id,
                                   });
-                                  toast.success("Dars olib tashlandi");
+                                  toast.success("Bo'lim olib tashlandi");
                                 }
                               }}
                               title="O'chirish"
@@ -864,120 +863,68 @@ export default function AdminGroups() {
           </DialogContent>
         </Dialog>
 
-        {/* Add Unit Dialog */}
-        <Dialog open={isAddUnitOpen} onOpenChange={(open) => {
-          setIsAddUnitOpen(open);
+        {/* Add Section Dialog */}
+        <Dialog open={isAddSectionOpen} onOpenChange={(open) => {
+          setIsAddSectionOpen(open);
           if (!open) {
             setSelectedSectionId('');
-            setSelectedLevelId('');
-            setSelectedUnitId('');
           }
         }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Dars qo'shish</DialogTitle>
+              <DialogTitle>Bo'lim qo'shish</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Bo'lim qo'shganingizda, shu bo'limdagi barcha darajalar va darslar talabalar uchun ochiq bo'ladi.
+              </p>
               <div>
                 <label className="text-sm font-medium">Bo'limni tanlang</label>
                 <Select
                   value={selectedSectionId}
-                  onValueChange={(value) => {
-                    setSelectedSectionId(value);
-                    setSelectedLevelId('');
-                    setSelectedUnitId('');
-                  }}
+                  onValueChange={setSelectedSectionId}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Bo'lim tanlang" />
                   </SelectTrigger>
                   <SelectContent>
-                    {sections?.map((section) => (
+                    {availableSections?.map((section) => (
                       <SelectItem key={section.id} value={section.id}>
                         {section.name}
                       </SelectItem>
                     ))}
+                    {availableSections?.length === 0 && (
+                      <SelectItem value="none" disabled>
+                        Barcha bo'limlar allaqachon qo'shilgan
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
-
-              {selectedSectionId && (
-                <div>
-                  <label className="text-sm font-medium">Darajani tanlang</label>
-                  <Select
-                    value={selectedLevelId}
-                    onValueChange={(value) => {
-                      setSelectedLevelId(value);
-                      setSelectedUnitId('');
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Daraja tanlang" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {levels?.map((level) => (
-                        <SelectItem key={level.id} value={level.id}>
-                          {level.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {selectedLevelId && (
-                <div>
-                  <label className="text-sm font-medium">Darsni tanlang</label>
-                  <Select
-                    value={selectedUnitId}
-                    onValueChange={setSelectedUnitId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Dars tanlang" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allUnits
-                        ?.filter(u => !groupUnits?.some(gu => gu.unit_id === u.id))
-                        .map((unit) => (
-                          <SelectItem key={unit.id} value={unit.id}>
-                            {unit.name}
-                          </SelectItem>
-                        ))}
-                      {allUnits?.filter(u => !groupUnits?.some(gu => gu.unit_id === u.id)).length === 0 && (
-                        <SelectItem value="none" disabled>
-                          Qo'shish uchun dars yo'q
-                        </SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setIsAddUnitOpen(false)}
+                onClick={() => setIsAddSectionOpen(false)}
               >
                 Bekor qilish
               </Button>
               <Button
                 onClick={() => {
-                  if (selectedGroup && selectedUnitId) {
-                    addGroupUnit.mutate({
+                  if (selectedGroup && selectedSectionId) {
+                    addGroupSection.mutate({
                       groupId: selectedGroup.id,
-                      unitId: selectedUnitId,
+                      sectionId: selectedSectionId,
                       createdBy: user?.id,
                     });
-                    setIsAddUnitOpen(false);
+                    setIsAddSectionOpen(false);
                     setSelectedSectionId('');
-                    setSelectedLevelId('');
-                    setSelectedUnitId('');
-                    toast.success("Dars qo'shildi");
+                    toast.success("Bo'lim qo'shildi");
                   }
                 }}
-                disabled={!selectedUnitId || addGroupUnit.isPending}
+                disabled={!selectedSectionId || addGroupSection.isPending}
               >
-                {addGroupUnit.isPending ? (
+                {addGroupSection.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : null}
                 Qo'shish
