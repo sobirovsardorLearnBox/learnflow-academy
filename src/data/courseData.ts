@@ -8,6 +8,7 @@ export interface Section {
   color: string;
   levelsCount: number;
   progress?: number;
+  isLocked?: boolean;
 }
 
 export interface Level {

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSections, useLevels, useUnits, Section, Level } from '@/hooks/useSections';
 import { useUserStats, useUnitProgress } from '@/hooks/useLessons';
-import { useUserAccessibleUnits } from '@/hooks/useGroupUnits';
+import { useUserAccessibleUnits, useUserAccessibleSections } from '@/hooks/useGroupSections';
 import { toast } from 'sonner';
 
 const iconMap: Record<string, any> = {
@@ -36,6 +36,7 @@ export default function Dashboard() {
   const { data: units, isLoading: unitsLoading } = useUnits(selectedLevel?.id);
   const { data: userStats } = useUserStats(user?.id);
   const { data: accessibleUnitIds } = useUserAccessibleUnits(user?.id);
+  const { data: accessibleSectionIds } = useUserAccessibleSections(user?.id);
   
   const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
   const { data: unitProgress } = useUnitProgress(unitIds, user?.id);
@@ -50,7 +51,11 @@ export default function Dashboard() {
 
   const isContentLocked = user.paymentStatus !== 'approved' && user.role === 'student';
 
-  const handleSectionClick = (section: Section) => {
+  const handleSectionClick = (section: Section, isLocked: boolean) => {
+    if (isLocked) {
+      toast.error("Bu bo'limga kirish uchun guruhga qo'shilishingiz kerak");
+      return;
+    }
     setSelectedSection(section);
     setView('levels');
   };
@@ -77,15 +82,21 @@ export default function Dashboard() {
     { label: 'Achievements', value: '0', icon: CreditCard, color: 'from-rose-500 to-pink-600' },
   ];
 
-  const transformedSections = (sections || []).map(section => ({
-    id: section.id,
-    title: section.name,
-    description: section.description || '',
-    icon: iconMap[section.icon || 'Code'] || Code,
-    color: 'from-primary to-accent',
-    progress: 0,
-    levelsCount: 5,
-  }));
+  const transformedSections = (sections || []).map(section => {
+    // For students, check if section is in their accessible list
+    const hasAccess = !isStudent || (accessibleSectionIds || []).includes(section.id);
+    
+    return {
+      id: section.id,
+      title: section.name,
+      description: section.description || '',
+      icon: iconMap[section.icon || 'Code'] || Code,
+      color: 'from-primary to-accent',
+      progress: 0,
+      levelsCount: 5,
+      isLocked: !hasAccess,
+    };
+  });
 
   const transformedLevels = (levels || []).map(level => ({
     id: level.id,
@@ -207,8 +218,8 @@ export default function Dashboard() {
               >
                 <SectionCard
                   section={section}
-                  onClick={() => handleSectionClick(sections!.find(s => s.id === section.id)!)}
-                  isLocked={isContentLocked}
+                  onClick={() => handleSectionClick(sections!.find(s => s.id === section.id)!, section.isLocked || false)}
+                  isLocked={isContentLocked || section.isLocked}
                 />
               </motion.div>
             ))}
