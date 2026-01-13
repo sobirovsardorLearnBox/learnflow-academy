@@ -921,7 +921,7 @@ export default function AdminGroups() {
                     addGroupSection.mutate({
                       groupId: selectedGroup.id,
                       sectionId: selectedSectionId,
-                      createdBy: user?.id,
+                      createdBy: user?.user_id,
                     }, {
                       onSuccess: () => {
                         setIsAddSectionOpen(false);
