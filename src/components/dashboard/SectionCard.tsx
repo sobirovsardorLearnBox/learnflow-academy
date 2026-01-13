@@ -41,7 +41,7 @@ export function SectionCard({ section, onClick, isLocked = false }: SectionCardP
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
             <div className="text-center">
               <Lock className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Payment Required</p>
+              <p className="text-sm text-muted-foreground">Kirish uchun guruhga qo'shiling</p>
             </div>
           </div>
         )}
