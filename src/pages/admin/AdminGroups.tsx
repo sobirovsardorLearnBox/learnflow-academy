@@ -711,8 +711,14 @@ export default function AdminGroups() {
                                   removeGroupSection.mutate({
                                     groupId: selectedGroup.id,
                                     sectionId: gs.section_id,
+                                  }, {
+                                    onSuccess: () => {
+                                      toast.success("Bo'lim olib tashlandi");
+                                    },
+                                    onError: () => {
+                                      toast.error("Bo'limni olib tashlashda xatolik");
+                                    }
                                   });
-                                  toast.success("Bo'lim olib tashlandi");
                                 }
                               }}
                               title="O'chirish"
@@ -916,10 +922,16 @@ export default function AdminGroups() {
                       groupId: selectedGroup.id,
                       sectionId: selectedSectionId,
                       createdBy: user?.id,
+                    }, {
+                      onSuccess: () => {
+                        setIsAddSectionOpen(false);
+                        setSelectedSectionId('');
+                        toast.success("Bo'lim qo'shildi");
+                      },
+                      onError: () => {
+                        toast.error("Bo'lim qo'shishda xatolik");
+                      }
                     });
-                    setIsAddSectionOpen(false);
-                    setSelectedSectionId('');
-                    toast.success("Bo'lim qo'shildi");
                   }
                 }}
                 disabled={!selectedSectionId || addGroupSection.isPending}
