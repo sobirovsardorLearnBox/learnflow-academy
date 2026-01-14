@@ -337,7 +337,7 @@ export default function AdminGroups() {
         user_id: selectedStudentId,
         is_approved: true,
         approved_at: new Date().toISOString(),
-        approved_by: user?.id,
+        approved_by: user?.user_id,
       });
       if (error) throw error;
     },
@@ -345,6 +345,8 @@ export default function AdminGroups() {
       queryClient.invalidateQueries({ queryKey: ['admin-group-members'] });
       queryClient.invalidateQueries({ queryKey: ['available-students-admin'] });
       queryClient.invalidateQueries({ queryKey: ['admin-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['user-accessible-units'] });
+      queryClient.invalidateQueries({ queryKey: ['user-accessible-sections'] });
       setIsAddMemberOpen(false);
       setSelectedStudentId('');
       toast.success("Talaba qo'shildi va tasdiqlandi");

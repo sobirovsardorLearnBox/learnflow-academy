@@ -313,6 +313,8 @@ export default function TeacherGroups() {
       queryClient.invalidateQueries({ queryKey: ['group-members'] });
       queryClient.invalidateQueries({ queryKey: ['available-students'] });
       queryClient.invalidateQueries({ queryKey: ['teacher-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['user-accessible-units'] });
+      queryClient.invalidateQueries({ queryKey: ['user-accessible-sections'] });
       setIsAddMemberOpen(false);
       setSelectedStudentId('');
       toast.success("Talaba qo'shildi va tasdiqlandi");
