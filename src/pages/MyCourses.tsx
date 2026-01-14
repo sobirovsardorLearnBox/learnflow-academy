@@ -99,11 +99,11 @@ export default function MyCourses() {
     enabled: !!user?.user_id,
   });
 
-  // Fetch sections for selected group
+  // Fetch sections for selected group with progress
   const { data: groupSections, isLoading: sectionsLoading } = useQuery({
-    queryKey: ['group-sections-full', selectedGroup?.id],
+    queryKey: ['group-sections-full', selectedGroup?.id, user?.user_id],
     queryFn: async () => {
-      if (!selectedGroup?.id) return [];
+      if (!selectedGroup?.id || !user?.user_id) return [];
       
       const { data: gs, error } = await supabase
         .from('group_sections')
@@ -125,9 +125,74 @@ export default function MyCourses() {
       
       if (sectionsError) throw sectionsError;
       
-      return sections || [];
+      // Calculate progress for each section
+      const sectionsWithProgress = await Promise.all(
+        (sections || []).map(async (section) => {
+          // Get all levels in this section
+          const { data: levelsData } = await supabase
+            .from('levels')
+            .select('id')
+            .eq('section_id', section.id)
+            .eq('is_active', true);
+          
+          if (!levelsData || levelsData.length === 0) {
+            return { ...section, progress: 0, totalLessons: 0, completedLessons: 0, levelsCount: 0 };
+          }
+          
+          const levelIds = levelsData.map(l => l.id);
+          
+          // Get all units in these levels
+          const { data: unitsData } = await supabase
+            .from('units')
+            .select('id')
+            .in('level_id', levelIds)
+            .eq('is_active', true);
+          
+          if (!unitsData || unitsData.length === 0) {
+            return { ...section, progress: 0, totalLessons: 0, completedLessons: 0, levelsCount: levelsData.length };
+          }
+          
+          const unitIds = unitsData.map(u => u.id);
+          
+          // Get all lessons in these units
+          const { data: lessonsData } = await supabase
+            .from('lessons')
+            .select('id')
+            .in('unit_id', unitIds)
+            .eq('is_active', true);
+          
+          const totalLessons = lessonsData?.length || 0;
+          
+          if (totalLessons === 0) {
+            return { ...section, progress: 0, totalLessons: 0, completedLessons: 0, levelsCount: levelsData.length };
+          }
+          
+          const lessonIds = lessonsData!.map(l => l.id);
+          
+          // Get completed lessons for this user
+          const { data: progressData } = await supabase
+            .from('lesson_progress')
+            .select('id')
+            .eq('user_id', user.user_id)
+            .eq('completed', true)
+            .in('lesson_id', lessonIds);
+          
+          const completedLessons = progressData?.length || 0;
+          const progress = Math.round((completedLessons / totalLessons) * 100);
+          
+          return { 
+            ...section, 
+            progress, 
+            totalLessons, 
+            completedLessons, 
+            levelsCount: levelsData.length 
+          };
+        })
+      );
+      
+      return sectionsWithProgress;
     },
-    enabled: !!selectedGroup?.id,
+    enabled: !!selectedGroup?.id && !!user?.user_id,
   });
 
   const { data: levels, isLoading: levelsLoading } = useLevels(selectedSection?.id);
@@ -178,15 +243,17 @@ export default function MyCourses() {
     }
   };
 
-  const transformedSections = (groupSections || []).map(section => ({
+  const transformedSections = (groupSections || []).map((section: any) => ({
     id: section.id,
     title: section.name,
     description: section.description || '',
     icon: iconMap[section.icon || 'Code'] || Code,
     color: 'from-primary to-accent',
-    progress: 0,
-    levelsCount: 5,
+    progress: section.progress || 0,
+    levelsCount: section.levelsCount || 0,
     isLocked: false,
+    totalLessons: section.totalLessons || 0,
+    completedLessons: section.completedLessons || 0,
   }));
 
   const transformedLevels = (levels || []).map(level => ({
