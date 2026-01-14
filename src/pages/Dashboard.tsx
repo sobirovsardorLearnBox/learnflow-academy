@@ -83,7 +83,7 @@ export default function Dashboard() {
   ];
 
   const transformedSections = (sections || []).map(section => {
-    // For students, check if section is in their accessible list
+    // For students on dashboard, ALL sections are shown but locked if no access
     const hasAccess = !isStudent || (accessibleSectionIds || []).includes(section.id);
     
     return {
@@ -94,7 +94,7 @@ export default function Dashboard() {
       color: 'from-primary to-accent',
       progress: 0,
       levelsCount: 5,
-      isLocked: !hasAccess,
+      isLocked: isStudent && !hasAccess, // Students see all but locked if no access
     };
   });
 

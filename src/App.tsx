@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import Dashboard from "./pages/Dashboard";
+import MyCourses from "./pages/MyCourses";
 import Payment from "./pages/Payment";
 import Profile from "./pages/Profile";
 import Lesson from "./pages/Lesson";
@@ -72,8 +73,8 @@ function AppRoutes() {
       } />
 
       <Route path="/courses" element={
-        <ProtectedRoute>
-          <Dashboard />
+        <ProtectedRoute allowedRoles={['student']}>
+          <MyCourses />
         </ProtectedRoute>
       } />
 
