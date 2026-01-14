@@ -45,9 +45,9 @@ export default function MyCourses() {
 
   // Fetch user's groups with assigned sections
   const { data: userGroups, isLoading: groupsLoading } = useQuery({
-    queryKey: ['my-groups', user?.id],
+    queryKey: ['my-groups', user?.user_id],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.user_id) return [];
       
       // Get groups where user is an approved member
       const { data: memberships, error: membershipError } = await supabase
@@ -61,7 +61,7 @@ export default function MyCourses() {
             teacher_id
           )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', user.user_id)
         .eq('is_approved', true);
       
       if (membershipError) throw membershipError;
@@ -96,7 +96,7 @@ export default function MyCourses() {
       
       return groupsWithDetails.filter(Boolean) as UserGroup[];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.user_id,
   });
 
   // Fetch sections for selected group
