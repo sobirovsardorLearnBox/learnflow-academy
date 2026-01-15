@@ -334,16 +334,20 @@ export default function MyCourses() {
       
       // First level is always unlocked
       let isLockedByProgress = false;
+      let prevProgressPercent = 0;
       
       if (index > 0) {
         // Check previous level's progress
         const prevLevel = sortedLevels[index - 1];
         const prevLevelProgress = levelProgressData?.[prevLevel.id];
-        const prevProgressPercent = prevLevelProgress?.progress || 0;
+        prevProgressPercent = prevLevelProgress?.progress || 0;
         
         // Lock if previous level is less than 80% complete
         isLockedByProgress = prevProgressPercent < 80;
       }
+      
+      // Calculate remaining progress needed to unlock (80% - current progress of previous level)
+      const unlockProgressNeeded = isLockedByProgress ? 80 - prevProgressPercent : 0;
       
       return {
         id: level.id,
@@ -353,6 +357,7 @@ export default function MyCourses() {
         progress: progressPercent,
         isLocked: isLockedByProgress,
         isLockedByProgress,
+        unlockProgressNeeded,
         unitsCount: levelProgress?.unitsCount || 0,
         totalLessons: levelProgress?.totalLessons || 0,
         completedLessons: levelProgress?.completedLessons || 0,
@@ -372,12 +377,13 @@ export default function MyCourses() {
       
       // First unit is always unlocked (if user has access)
       let isLockedByProgress = false;
+      let prevProgressPercent = 0;
       
       if (index > 0) {
         // Check previous unit's progress
         const prevUnit = sortedUnits[index - 1];
         const prevProgress = unitProgress?.[prevUnit.id];
-        const prevProgressPercent = prevProgress 
+        prevProgressPercent = prevProgress 
           ? Math.round((prevProgress.completed / prevProgress.total) * 100) 
           : 0;
         
@@ -388,6 +394,9 @@ export default function MyCourses() {
       // First unit is always unlocked
       const isFirstUnit = index === 0;
       
+      // Calculate remaining progress needed to unlock (80% - current progress of previous unit)
+      const unlockProgressNeeded = isLockedByProgress && !isFirstUnit ? 80 - prevProgressPercent : 0;
+      
       return {
         id: unit.id,
         levelId: unit.level_id,
@@ -396,6 +405,7 @@ export default function MyCourses() {
         isCompleted,
         isLocked: isFirstUnit ? false : (!hasAccess || isLockedByProgress),
         isLockedByProgress: isFirstUnit ? false : isLockedByProgress,
+        unlockProgressNeeded,
         subUnits: progress ? [`${progress.completed}/${progress.total} dars`] : ['Darslar yo\'q'],
         progress: progressPercent,
       };
