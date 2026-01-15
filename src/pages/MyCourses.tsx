@@ -222,9 +222,13 @@ export default function MyCourses() {
     setView('units');
   };
 
-  const handleUnitClick = (unitId: string, isLocked: boolean) => {
+  const handleUnitClick = (unitId: string, isLocked: boolean, isLockedByProgress?: boolean) => {
     if (isLocked) {
-      toast.error("Bu darsga kirish uchun ruxsat yo'q");
+      if (isLockedByProgress) {
+        toast.error("Oldingi unitni kamida 80% bajaring");
+      } else {
+        toast.error("Bu darsga kirish uchun ruxsat yo'q");
+      }
       return;
     }
     navigate(`/lesson/${unitId}`);
@@ -266,23 +270,44 @@ export default function MyCourses() {
     unitsCount: 12,
   }));
 
-  const transformedUnits = (units || []).map(unit => {
-    const progress = unitProgress?.[unit.id];
-    const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
-    const isCompleted = progress ? progress.completed === progress.total && progress.total > 0 : false;
-    const hasAccess = (accessibleUnitIds || []).includes(unit.id);
+  // Calculate unit lock status based on previous unit progress (80% threshold)
+  const transformedUnits = useMemo(() => {
+    const sortedUnits = [...(units || [])].sort((a, b) => Number(a.unit_number) - Number(b.unit_number));
     
-    return {
-      id: unit.id,
-      levelId: unit.level_id,
-      number: unit.unit_number,
-      title: unit.name,
-      isCompleted,
-      isLocked: !hasAccess,
-      subUnits: progress ? [`${progress.completed}/${progress.total} lessons`] : ['No lessons'],
-      progress: progressPercent,
-    };
-  });
+    return sortedUnits.map((unit, index) => {
+      const progress = unitProgress?.[unit.id];
+      const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
+      const isCompleted = progress ? progress.completed === progress.total && progress.total > 0 : false;
+      const hasAccess = (accessibleUnitIds || []).includes(unit.id);
+      
+      // First unit is always unlocked (if user has access)
+      let isLockedByProgress = false;
+      
+      if (index > 0) {
+        // Check previous unit's progress
+        const prevUnit = sortedUnits[index - 1];
+        const prevProgress = unitProgress?.[prevUnit.id];
+        const prevProgressPercent = prevProgress 
+          ? Math.round((prevProgress.completed / prevProgress.total) * 100) 
+          : 0;
+        
+        // Lock if previous unit is less than 80% complete
+        isLockedByProgress = prevProgressPercent < 80;
+      }
+      
+      return {
+        id: unit.id,
+        levelId: unit.level_id,
+        number: unit.unit_number,
+        title: unit.name,
+        isCompleted,
+        isLocked: !hasAccess || isLockedByProgress,
+        isLockedByProgress,
+        subUnits: progress ? [`${progress.completed}/${progress.total} dars`] : ['Darslar yo\'q'],
+        progress: progressPercent,
+      };
+    });
+  }, [units, unitProgress, accessibleUnitIds]);
 
   return (
     <DashboardLayout>
@@ -445,7 +470,7 @@ export default function MyCourses() {
                 key={unit.id}
                 unit={unit}
                 index={index}
-                onClick={() => handleUnitClick(unit.id, unit.isLocked)}
+                onClick={() => handleUnitClick(unit.id, unit.isLocked, unit.isLockedByProgress)}
               />
             ))}
           </div>
