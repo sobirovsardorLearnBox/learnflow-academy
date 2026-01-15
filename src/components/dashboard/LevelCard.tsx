@@ -56,7 +56,13 @@ export function LevelCard({ level, index, onClick }: LevelCardProps) {
               {level.description}
             </p>
             
-            {!level.isLocked && level.progress !== undefined && (
+            {level.isLocked && (level as any).unlockProgressNeeded > 0 ? (
+              <div className="mt-2">
+                <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  🔒 Ochish uchun yana {(level as any).unlockProgressNeeded}% kerak
+                </span>
+              </div>
+            ) : !level.isLocked && level.progress !== undefined && (
               <div className="mt-2 flex items-center gap-3">
                 <div className="progress-bar h-1.5 flex-1">
                   <div

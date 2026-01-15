@@ -50,15 +50,21 @@ export function UnitCard({ unit, index, onClick }: UnitCardProps) {
 
             <div className="flex-1 min-w-0">
               <h4 className="font-medium">{unit.title}</h4>
-              <div className="flex gap-2 mt-1">
-                {unit.subUnits.map((sub) => (
-                  <span
-                    key={sub}
-                    className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground"
-                  >
-                    {sub}
+              <div className="flex gap-2 mt-1 flex-wrap">
+                {unit.isLocked && (unit as any).unlockProgressNeeded > 0 ? (
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                    🔒 Ochish uchun yana {(unit as any).unlockProgressNeeded}% kerak
                   </span>
-                ))}
+                ) : (
+                  unit.subUnits.map((sub) => (
+                    <span
+                      key={sub}
+                      className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground"
+                    >
+                      {sub}
+                    </span>
+                  ))
+                )}
               </div>
             </div>
 
