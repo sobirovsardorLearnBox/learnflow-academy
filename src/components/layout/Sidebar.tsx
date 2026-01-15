@@ -22,7 +22,6 @@ import { cn } from '@/lib/utils';
 
 const navItems = {
   student: [
-    { icon: LayoutDashboard, label: 'Bosh sahifa', path: '/dashboard' },
     { icon: GraduationCap, label: 'Kurslarim', path: '/courses' },
     { icon: CreditCard, label: "To'lov", path: '/payment' },
     { icon: User, label: 'Profil', path: '/profile' },
