@@ -55,19 +55,26 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
 }
 
 function AppRoutes() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return <LoadingScreen />;
   }
 
+  // Determine default route based on user role
+  const getDefaultRoute = () => {
+    if (!isAuthenticated) return '/';
+    if (user?.role === 'student') return '/courses';
+    return '/dashboard';
+  };
+
   return (
     <Routes>
-      <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
-      <Route path="/setup" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Setup />} />
+      <Route path="/" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Login />} />
+      <Route path="/setup" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Setup />} />
       
       <Route path="/dashboard" element={
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
           <Dashboard />
         </ProtectedRoute>
       } />
