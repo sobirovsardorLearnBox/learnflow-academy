@@ -295,14 +295,17 @@ export default function MyCourses() {
         isLockedByProgress = prevProgressPercent < 80;
       }
       
+      // First unit is always unlocked
+      const isFirstUnit = index === 0;
+      
       return {
         id: unit.id,
         levelId: unit.level_id,
         number: unit.unit_number,
         title: unit.name,
         isCompleted,
-        isLocked: !hasAccess || isLockedByProgress,
-        isLockedByProgress,
+        isLocked: isFirstUnit ? false : (!hasAccess || isLockedByProgress),
+        isLockedByProgress: isFirstUnit ? false : isLockedByProgress,
         subUnits: progress ? [`${progress.completed}/${progress.total} dars`] : ['Darslar yo\'q'],
         progress: progressPercent,
       };
