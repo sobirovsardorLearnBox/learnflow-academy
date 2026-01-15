@@ -202,6 +202,64 @@ export default function MyCourses() {
   const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
   const { data: unitProgress } = useUnitProgress(unitIds, user?.id);
 
+  // Fetch level progress for all levels in selected section
+  const { data: levelProgressData } = useQuery({
+    queryKey: ['level-progress', selectedSection?.id, user?.user_id],
+    queryFn: async () => {
+      if (!selectedSection?.id || !user?.user_id || !levels) return {};
+      
+      const progressMap: Record<string, { progress: number; totalLessons: number; completedLessons: number; unitsCount: number }> = {};
+      
+      for (const level of levels) {
+        // Get all units in this level
+        const { data: unitsData } = await supabase
+          .from('units')
+          .select('id')
+          .eq('level_id', level.id)
+          .eq('is_active', true);
+        
+        if (!unitsData || unitsData.length === 0) {
+          progressMap[level.id] = { progress: 0, totalLessons: 0, completedLessons: 0, unitsCount: 0 };
+          continue;
+        }
+        
+        const unitIds = unitsData.map(u => u.id);
+        
+        // Get all lessons in these units
+        const { data: lessonsData } = await supabase
+          .from('lessons')
+          .select('id')
+          .in('unit_id', unitIds)
+          .eq('is_active', true);
+        
+        const totalLessons = lessonsData?.length || 0;
+        
+        if (totalLessons === 0) {
+          progressMap[level.id] = { progress: 0, totalLessons: 0, completedLessons: 0, unitsCount: unitsData.length };
+          continue;
+        }
+        
+        const lessonIds = lessonsData!.map(l => l.id);
+        
+        // Get completed lessons for this user
+        const { data: progressData } = await supabase
+          .from('lesson_progress')
+          .select('id')
+          .eq('user_id', user.user_id)
+          .eq('completed', true)
+          .in('lesson_id', lessonIds);
+        
+        const completedLessons = progressData?.length || 0;
+        const progress = Math.round((completedLessons / totalLessons) * 100);
+        
+        progressMap[level.id] = { progress, totalLessons, completedLessons, unitsCount: unitsData.length };
+      }
+      
+      return progressMap;
+    },
+    enabled: !!selectedSection?.id && !!user?.user_id && !!levels && levels.length > 0,
+  });
+
   if (!user) {
     navigate('/');
     return null;
@@ -217,7 +275,13 @@ export default function MyCourses() {
     setView('levels');
   };
 
-  const handleLevelClick = (level: Level) => {
+  const handleLevelClick = (level: Level, isLocked: boolean, isLockedByProgress?: boolean) => {
+    if (isLocked) {
+      if (isLockedByProgress) {
+        toast.error("Oldingi levelni kamida 80% bajaring");
+      }
+      return;
+    }
     setSelectedLevel(level);
     setView('units');
   };
@@ -260,15 +324,41 @@ export default function MyCourses() {
     completedLessons: section.completedLessons || 0,
   }));
 
-  const transformedLevels = (levels || []).map(level => ({
-    id: level.id,
-    sectionId: level.section_id,
-    title: level.name,
-    description: level.description || '',
-    progress: 0,
-    isLocked: false,
-    unitsCount: 12,
-  }));
+  // Calculate level lock status based on previous level progress (80% threshold)
+  const transformedLevels = useMemo(() => {
+    const sortedLevels = [...(levels || [])].sort((a, b) => a.level_number - b.level_number);
+    
+    return sortedLevels.map((level, index) => {
+      const levelProgress = levelProgressData?.[level.id];
+      const progressPercent = levelProgress?.progress || 0;
+      
+      // First level is always unlocked
+      let isLockedByProgress = false;
+      
+      if (index > 0) {
+        // Check previous level's progress
+        const prevLevel = sortedLevels[index - 1];
+        const prevLevelProgress = levelProgressData?.[prevLevel.id];
+        const prevProgressPercent = prevLevelProgress?.progress || 0;
+        
+        // Lock if previous level is less than 80% complete
+        isLockedByProgress = prevProgressPercent < 80;
+      }
+      
+      return {
+        id: level.id,
+        sectionId: level.section_id,
+        title: level.name,
+        description: level.description || '',
+        progress: progressPercent,
+        isLocked: isLockedByProgress,
+        isLockedByProgress,
+        unitsCount: levelProgress?.unitsCount || 0,
+        totalLessons: levelProgress?.totalLessons || 0,
+        completedLessons: levelProgress?.completedLessons || 0,
+      };
+    });
+  }, [levels, levelProgressData]);
 
   // Calculate unit lock status based on previous unit progress (80% threshold)
   const transformedUnits = useMemo(() => {
@@ -449,7 +539,11 @@ export default function MyCourses() {
                 key={level.id}
                 level={level}
                 index={index}
-                onClick={() => handleLevelClick(levels!.find(l => l.id === level.id)!)}
+                onClick={() => handleLevelClick(
+                  levels!.find(l => l.id === level.id)!, 
+                  level.isLocked, 
+                  level.isLockedByProgress
+                )}
               />
             ))}
           </div>
