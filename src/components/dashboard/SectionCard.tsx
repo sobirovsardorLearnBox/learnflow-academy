@@ -75,11 +75,16 @@ export function SectionCard({ section, onClick, isLocked = false }: SectionCardP
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Progress</span>
-                <span className="font-medium text-primary">{section.progress}%</span>
+                <span className={cn(
+                  'font-medium',
+                  section.progress >= 80 ? 'text-success' : 'text-primary'
+                )}>
+                  {section.progress}%
+                </span>
               </div>
               <div className="progress-bar h-2">
                 <div
-                  className="progress-bar-fill"
+                  className={section.progress >= 80 ? 'progress-bar-fill-success' : 'progress-bar-fill'}
                   style={{ width: `${section.progress}%` }}
                 />
               </div>
