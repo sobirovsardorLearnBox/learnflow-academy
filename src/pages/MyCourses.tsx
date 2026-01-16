@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Code, BookOpen, Languages, Shield, Loader2, Lock, Users } from 'lucide-react';
@@ -16,6 +16,7 @@ import { useUnitProgress } from '@/hooks/useLessons';
 import { useUserAccessibleUnits, useUserAccessibleSections } from '@/hooks/useGroupSections';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useConfetti } from '@/hooks/useConfetti';
 import { toast } from 'sonner';
 
 const iconMap: Record<string, any> = {
@@ -42,6 +43,8 @@ export default function MyCourses() {
   const [selectedGroup, setSelectedGroup] = useState<UserGroup | null>(null);
   const [selectedSection, setSelectedSection] = useState<Section | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
+  const { triggerSuccessConfetti } = useConfetti();
+  const confettiTriggeredFor = useRef<Set<string>>(new Set());
 
   // Fetch user's groups with assigned sections
   const { data: userGroups, isLoading: groupsLoading } = useQuery({
@@ -446,6 +449,40 @@ export default function MyCourses() {
       };
     });
   }, [units, unitProgress, accessibleUnitIds]);
+
+  // Trigger confetti when a section, level, or unit reaches 100%
+  useEffect(() => {
+    // Check sections for 100% completion
+    transformedSections.forEach((section) => {
+      if (section.progress === 100 && !confettiTriggeredFor.current.has(`section-${section.id}`)) {
+        confettiTriggeredFor.current.add(`section-${section.id}`);
+        triggerSuccessConfetti();
+        toast.success(`🎉 "${section.title}" bo'limi tugallandi!`);
+      }
+    });
+  }, [transformedSections, triggerSuccessConfetti]);
+
+  useEffect(() => {
+    // Check levels for 100% completion
+    transformedLevels.forEach((level) => {
+      if (level.progress === 100 && !confettiTriggeredFor.current.has(`level-${level.id}`)) {
+        confettiTriggeredFor.current.add(`level-${level.id}`);
+        triggerSuccessConfetti();
+        toast.success(`🎉 "${level.title}" darajasi tugallandi!`);
+      }
+    });
+  }, [transformedLevels, triggerSuccessConfetti]);
+
+  useEffect(() => {
+    // Check units for 100% completion
+    transformedUnits.forEach((unit) => {
+      if (unit.progress === 100 && !confettiTriggeredFor.current.has(`unit-${unit.id}`)) {
+        confettiTriggeredFor.current.add(`unit-${unit.id}`);
+        triggerSuccessConfetti();
+        toast.success(`🎉 "${unit.title}" uniti tugallandi!`);
+      }
+    });
+  }, [transformedUnits, triggerSuccessConfetti]);
 
   return (
     <DashboardLayout>

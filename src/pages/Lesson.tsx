@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, BookOpen, Video, FileText, HelpCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLessons, useLesson, useQuizzes, useMarkLessonComplete, useMarkUnitComplete, useLessonProgress } from '@/hooks/useLessons';
+import { useConfetti } from '@/hooks/useConfetti';
 import { toast } from 'sonner';
 
 export default function Lesson() {
@@ -28,8 +29,10 @@ export default function Lesson() {
   const { data: lessonProgress } = useLessonProgress(user?.id);
   const markLessonComplete = useMarkLessonComplete();
   const markUnitComplete = useMarkUnitComplete();
+  const { triggerSuccessConfetti } = useConfetti();
   
   const [activeTab, setActiveTab] = useState('content');
+  const hasTriggeredConfetti = useRef(false);
 
   // Get completed lessons from database
   const completedLessons = useMemo(() => {
@@ -39,6 +42,19 @@ export default function Lesson() {
       .filter(p => lessonIds.includes(p.lesson_id))
       .map(p => p.lesson_id);
   }, [lessonProgress, lessons]);
+
+  // Trigger confetti when all lessons are completed
+  useEffect(() => {
+    if (
+      lessons && 
+      lessons.length > 0 && 
+      completedLessons.length === lessons.length && 
+      !hasTriggeredConfetti.current
+    ) {
+      hasTriggeredConfetti.current = true;
+      triggerSuccessConfetti();
+    }
+  }, [completedLessons.length, lessons, triggerSuccessConfetti]);
 
   // Set first lesson if none selected
   useEffect(() => {
