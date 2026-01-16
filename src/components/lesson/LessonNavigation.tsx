@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, PlayCircle, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import type { Lesson } from '@/hooks/useLessons';
 
 interface LessonNavigationProps {
@@ -38,33 +39,63 @@ export function LessonNavigation({
               "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all",
               isCurrent && "bg-primary/10 border border-primary/30",
               !isCurrent && !isLocked && "hover:bg-secondary/50",
-              isLocked && "opacity-50 cursor-not-allowed"
+              isLocked && "opacity-50 cursor-not-allowed",
+              isCompleted && !isCurrent && "bg-success/5 border border-success/20"
             )}
           >
-            <div className={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-              isCompleted && "bg-emerald-500/20 text-emerald-500",
-              isCurrent && !isCompleted && "bg-primary/20 text-primary",
-              !isCurrent && !isCompleted && !isLocked && "bg-secondary text-muted-foreground",
-              isLocked && "bg-secondary text-muted-foreground"
-            )}>
+            <motion.div 
+              className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+                isCompleted && "bg-success/20 text-success",
+                isCurrent && !isCompleted && "bg-primary/20 text-primary",
+                !isCurrent && !isCompleted && !isLocked && "bg-secondary text-muted-foreground",
+                isLocked && "bg-secondary text-muted-foreground"
+              )}
+              animate={isCompleted ? { 
+                scale: [1, 1.1, 1],
+              } : {}}
+              transition={{ duration: 0.3 }}
+            >
               {isLocked ? (
                 <Lock className="w-4 h-4" />
               ) : isCompleted ? (
-                <CheckCircle2 className="w-5 h-5" />
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                </motion.div>
               ) : isCurrent ? (
                 <PlayCircle className="w-5 h-5" />
               ) : (
                 <Circle className="w-4 h-4" />
               )}
-            </div>
+            </motion.div>
             <div className="flex-1 min-w-0">
-              <p className={cn(
-                "text-sm font-medium truncate",
-                isCurrent && "text-primary"
-              )}>
-                {lesson.lesson_number}. {lesson.title}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className={cn(
+                  "text-sm font-medium truncate",
+                  isCurrent && "text-primary",
+                  isCompleted && "text-success"
+                )}>
+                  {lesson.lesson_number}. {lesson.title}
+                </p>
+                {isCompleted && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  >
+                    <Badge 
+                      variant="outline" 
+                      className="bg-success/10 text-success border-success/30 text-[10px] px-1.5 py-0"
+                    >
+                      ✓ Tugallandi
+                    </Badge>
+                  </motion.div>
+                )}
+              </div>
               {lesson.duration_minutes && (
                 <p className="text-xs text-muted-foreground">
                   {lesson.duration_minutes} min
