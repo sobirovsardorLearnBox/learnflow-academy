@@ -270,7 +270,13 @@ export default function MyCourses() {
     setView('sections');
   };
 
-  const handleSectionClick = (section: any) => {
+  const handleSectionClick = (section: any, isLocked?: boolean, isLockedByProgress?: boolean) => {
+    if (isLocked) {
+      if (isLockedByProgress) {
+        toast.error("Oldingi bo'limni kamida 80% bajaring");
+      }
+      return;
+    }
     setSelectedSection(section);
     setView('levels');
   };
@@ -311,18 +317,47 @@ export default function MyCourses() {
     }
   };
 
-  const transformedSections = (groupSections || []).map((section: any) => ({
-    id: section.id,
-    title: section.name,
-    description: section.description || '',
-    icon: iconMap[section.icon || 'Code'] || Code,
-    color: 'from-primary to-accent',
-    progress: section.progress || 0,
-    levelsCount: section.levelsCount || 0,
-    isLocked: false,
-    totalLessons: section.totalLessons || 0,
-    completedLessons: section.completedLessons || 0,
-  }));
+  // Calculate section lock status based on previous section progress (80% threshold)
+  const transformedSections = useMemo(() => {
+    const sortedSections = [...(groupSections || [])].sort((a: any, b: any) => 
+      (a.display_order || 0) - (b.display_order || 0)
+    );
+    
+    return sortedSections.map((section: any, index: number) => {
+      const progressPercent = section.progress || 0;
+      
+      // First section is always unlocked
+      let isLockedByProgress = false;
+      let prevProgressPercent = 0;
+      
+      if (index > 0) {
+        // Check previous section's progress
+        const prevSection = sortedSections[index - 1];
+        prevProgressPercent = prevSection.progress || 0;
+        
+        // Lock if previous section is less than 80% complete
+        isLockedByProgress = prevProgressPercent < 80;
+      }
+      
+      // Calculate remaining progress needed to unlock (80% - current progress of previous section)
+      const unlockProgressNeeded = isLockedByProgress ? 80 - prevProgressPercent : 0;
+      
+      return {
+        id: section.id,
+        title: section.name,
+        description: section.description || '',
+        icon: iconMap[section.icon || 'Code'] || Code,
+        color: 'from-primary to-accent',
+        progress: progressPercent,
+        levelsCount: section.levelsCount || 0,
+        isLocked: isLockedByProgress,
+        isLockedByProgress,
+        unlockProgressNeeded,
+        totalLessons: section.totalLessons || 0,
+        completedLessons: section.completedLessons || 0,
+      };
+    });
+  }, [groupSections]);
 
   // Calculate level lock status based on previous level progress (80% threshold)
   const transformedLevels = useMemo(() => {
@@ -523,8 +558,12 @@ export default function MyCourses() {
               >
                 <SectionCard
                   section={section}
-                  onClick={() => handleSectionClick(groupSections?.find(s => s.id === section.id))}
-                  isLocked={false}
+                  onClick={() => handleSectionClick(
+                    groupSections?.find(s => s.id === section.id),
+                    section.isLocked,
+                    section.isLockedByProgress
+                  )}
+                  isLocked={section.isLocked}
                 />
               </motion.div>
             ))}

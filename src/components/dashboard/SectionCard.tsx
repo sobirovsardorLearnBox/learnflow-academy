@@ -5,7 +5,7 @@ import { Section } from '@/data/courseData';
 import { cn } from '@/lib/utils';
 
 interface SectionCardProps {
-  section: Section;
+  section: Section & { isLockedByProgress?: boolean; unlockProgressNeeded?: number };
   onClick: () => void;
   isLocked?: boolean;
 }
@@ -41,7 +41,13 @@ export function SectionCard({ section, onClick, isLocked = false }: SectionCardP
           <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
             <div className="text-center">
               <Lock className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Kirish uchun guruhga qo'shiling</p>
+              {section.isLockedByProgress && section.unlockProgressNeeded && section.unlockProgressNeeded > 0 ? (
+                <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+                  🔒 Ochish uchun yana {section.unlockProgressNeeded}% kerak
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Kirish uchun guruhga qo'shiling</p>
+              )}
             </div>
           </div>
         )}
