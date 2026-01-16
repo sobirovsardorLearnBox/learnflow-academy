@@ -74,7 +74,7 @@ export function UnitCard({ unit, index, onClick }: UnitCardProps) {
                 <span
                   className={cn(
                     'text-sm font-medium',
-                    unit.isCompleted ? 'text-success' : 'text-primary'
+                    unit.progress >= 80 ? 'text-success' : unit.isCompleted ? 'text-success' : 'text-primary'
                   )}
                 >
                   {unit.progress}%

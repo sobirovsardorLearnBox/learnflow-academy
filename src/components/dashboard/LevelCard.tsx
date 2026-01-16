@@ -66,11 +66,14 @@ export function LevelCard({ level, index, onClick }: LevelCardProps) {
               <div className="mt-2 flex items-center gap-3">
                 <div className="progress-bar h-1.5 flex-1">
                   <div
-                    className="progress-bar-fill"
+                    className={level.progress >= 80 ? 'progress-bar-fill-success' : 'progress-bar-fill'}
                     style={{ width: `${level.progress}%` }}
                   />
                 </div>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                <span className={cn(
+                  'text-xs whitespace-nowrap',
+                  level.progress >= 80 ? 'text-success' : 'text-muted-foreground'
+                )}>
                   {level.progress}%
                 </span>
               </div>
