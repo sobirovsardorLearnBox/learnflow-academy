@@ -21,6 +21,8 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminGroups from "./pages/admin/AdminGroups";
 import TeacherGroups from "./pages/teacher/TeacherGroups";
 import TeacherLessons from "./pages/teacher/TeacherLessons";
+import TeacherAttendance from "./pages/teacher/TeacherAttendance";
+import AdminAttendance from "./pages/admin/AdminAttendance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -156,6 +158,18 @@ function AppRoutes() {
       <Route path="/lessons" element={
         <ProtectedRoute allowedRoles={['teacher']}>
           <TeacherLessons />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/attendance" element={
+        <ProtectedRoute allowedRoles={['teacher']}>
+          <TeacherAttendance />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/attendance" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminAttendance />
         </ProtectedRoute>
       } />
 
