@@ -7,6 +7,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { VideoPlayer } from '@/components/lesson/VideoPlayer';
 import { QuizComponent } from '@/components/lesson/QuizComponent';
 import { LessonNavigation } from '@/components/lesson/LessonNavigation';
+import { AchievementModal } from '@/components/achievement/AchievementModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,6 +34,11 @@ export default function Lesson() {
   
   const [activeTab, setActiveTab] = useState('content');
   const hasTriggeredConfetti = useRef(false);
+  const [achievementModal, setAchievementModal] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+  }>({ open: false, title: '', description: '' });
 
   // Get completed lessons from database
   const completedLessons = useMemo(() => {
@@ -43,7 +49,7 @@ export default function Lesson() {
       .map(p => p.lesson_id);
   }, [lessonProgress, lessons]);
 
-  // Trigger confetti when all lessons are completed
+  // Trigger confetti and achievement modal when all lessons are completed
   useEffect(() => {
     if (
       lessons && 
@@ -53,6 +59,11 @@ export default function Lesson() {
     ) {
       hasTriggeredConfetti.current = true;
       triggerSuccessConfetti();
+      setAchievementModal({
+        open: true,
+        title: "Unit tugallandi!",
+        description: `Siz barcha ${lessons.length} ta darsni muvaffaqiyatli tugatdingiz. Ajoyib natija!`
+      });
     }
   }, [completedLessons.length, lessons, triggerSuccessConfetti]);
 
@@ -331,6 +342,15 @@ export default function Lesson() {
           )}
         </motion.main>
       </div>
+
+      {/* Achievement Modal */}
+      <AchievementModal
+        open={achievementModal.open}
+        onClose={() => setAchievementModal(prev => ({ ...prev, open: false }))}
+        title={achievementModal.title}
+        description={achievementModal.description}
+        type="unit"
+      />
     </DashboardLayout>
   );
 }
