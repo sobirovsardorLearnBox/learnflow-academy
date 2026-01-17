@@ -7,6 +7,7 @@ import { SectionCard } from '@/components/dashboard/SectionCard';
 import { LevelCard } from '@/components/dashboard/LevelCard';
 import { UnitCard } from '@/components/dashboard/UnitCard';
 import { PaymentBanner } from '@/components/dashboard/PaymentBanner';
+import { AchievementModal } from '@/components/achievement/AchievementModal';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,12 @@ export default function MyCourses() {
   const [selectedLevel, setSelectedLevel] = useState<Level | null>(null);
   const { triggerSuccessConfetti } = useConfetti();
   const confettiTriggeredFor = useRef<Set<string>>(new Set());
+  const [achievementModal, setAchievementModal] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    type: "section" | "level" | "unit";
+  }>({ open: false, title: '', description: '', type: 'unit' });
 
   // Fetch user's groups with assigned sections
   const { data: userGroups, isLoading: groupsLoading } = useQuery({
@@ -457,7 +464,12 @@ export default function MyCourses() {
       if (section.progress === 100 && !confettiTriggeredFor.current.has(`section-${section.id}`)) {
         confettiTriggeredFor.current.add(`section-${section.id}`);
         triggerSuccessConfetti();
-        toast.success(`🎉 "${section.title}" bo'limi tugallandi!`);
+        setAchievementModal({
+          open: true,
+          title: `"${section.title}" bo'limi tugallandi!`,
+          description: "Siz ushbu bo'limni muvaffaqiyatli tugatdingiz. Yangi yutuqlaringiz kutmoqda!",
+          type: 'section'
+        });
       }
     });
   }, [transformedSections, triggerSuccessConfetti]);
@@ -468,7 +480,12 @@ export default function MyCourses() {
       if (level.progress === 100 && !confettiTriggeredFor.current.has(`level-${level.id}`)) {
         confettiTriggeredFor.current.add(`level-${level.id}`);
         triggerSuccessConfetti();
-        toast.success(`🎉 "${level.title}" darajasi tugallandi!`);
+        setAchievementModal({
+          open: true,
+          title: `"${level.title}" darajasi tugallandi!`,
+          description: "Ajoyib natija! Siz ushbu darajani muvaffaqiyatli o'tdingiz.",
+          type: 'level'
+        });
       }
     });
   }, [transformedLevels, triggerSuccessConfetti]);
@@ -479,7 +496,12 @@ export default function MyCourses() {
       if (unit.progress === 100 && !confettiTriggeredFor.current.has(`unit-${unit.id}`)) {
         confettiTriggeredFor.current.add(`unit-${unit.id}`);
         triggerSuccessConfetti();
-        toast.success(`🎉 "${unit.title}" uniti tugallandi!`);
+        setAchievementModal({
+          open: true,
+          title: `"${unit.title}" uniti tugallandi!`,
+          description: "Zo'r! Siz barcha darslarni muvaffaqiyatli yakunladingiz.",
+          type: 'unit'
+        });
       }
     });
   }, [transformedUnits, triggerSuccessConfetti]);
@@ -659,6 +681,15 @@ export default function MyCourses() {
           </div>
         )
       )}
+
+      {/* Achievement Modal */}
+      <AchievementModal
+        open={achievementModal.open}
+        onClose={() => setAchievementModal(prev => ({ ...prev, open: false }))}
+        title={achievementModal.title}
+        description={achievementModal.description}
+        type={achievementModal.type}
+      />
     </DashboardLayout>
   );
 }
