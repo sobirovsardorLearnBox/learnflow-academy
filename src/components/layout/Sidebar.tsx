@@ -15,6 +15,7 @@ import {
   BarChart3,
   User,
   UsersRound,
+  CalendarCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -30,7 +31,7 @@ const navItems = {
     { icon: LayoutDashboard, label: 'Bosh sahifa', path: '/dashboard' },
     { icon: Users, label: 'Guruhlarim', path: '/groups' },
     { icon: GraduationCap, label: 'Darslar', path: '/lessons' },
-    { icon: BarChart3, label: 'Talabalar progressi', path: '/admin/progress' },
+    { icon: CalendarCheck, label: 'Davomat', path: '/attendance' },
     { icon: User, label: 'Profil', path: '/profile' },
   ],
   admin: [
@@ -40,7 +41,8 @@ const navItems = {
     { icon: GraduationCap, label: "Bo'limlar", path: '/admin/sections' },
     { icon: CreditCard, label: "To'lovlar", path: '/admin/payments' },
     { icon: Shield, label: 'Qurilmalar', path: '/admin/devices' },
-    { icon: BarChart3, label: 'Talabalar progressi', path: '/admin/progress' },
+    { icon: CalendarCheck, label: 'Davomat', path: '/admin/attendance' },
+    { icon: BarChart3, label: 'Progress', path: '/admin/progress' },
     { icon: Settings, label: 'Sozlamalar', path: '/admin/settings' },
     { icon: User, label: 'Profil', path: '/profile' },
   ],
