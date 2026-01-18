@@ -24,6 +24,7 @@ import AdminGroups from "./pages/admin/AdminGroups";
 import TeacherGroups from "./pages/teacher/TeacherGroups";
 import TeacherLessons from "./pages/teacher/TeacherLessons";
 import TeacherAttendance from "./pages/teacher/TeacherAttendance";
+import TeacherStatistics from "./pages/teacher/TeacherStatistics";
 import AdminAttendance from "./pages/admin/AdminAttendance";
 import NotFound from "./pages/NotFound";
 
@@ -178,6 +179,12 @@ function AppRoutes() {
       <Route path="/attendance" element={
         <ProtectedRoute allowedRoles={['teacher']}>
           <TeacherAttendance />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teacher/statistics" element={
+        <ProtectedRoute allowedRoles={['teacher']}>
+          <TeacherStatistics />
         </ProtectedRoute>
       } />
 

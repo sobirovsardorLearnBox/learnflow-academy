@@ -35,6 +35,7 @@ const navItems = {
     { icon: Users, label: 'Guruhlarim', path: '/groups' },
     { icon: GraduationCap, label: 'Darslar', path: '/lessons' },
     { icon: CalendarCheck, label: 'Davomat', path: '/attendance' },
+    { icon: BarChart3, label: 'Statistika', path: '/teacher/statistics' },
     { icon: User, label: 'Profil', path: '/profile' },
   ],
   admin: [
