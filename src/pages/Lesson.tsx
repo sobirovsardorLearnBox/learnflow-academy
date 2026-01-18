@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams, useBeforeUnload } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, BookOpen, Video, FileText, HelpCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLessons, useLesson, useQuizzes, useMarkLessonComplete, useMarkUnitComplete, useLessonProgress } from '@/hooks/useLessons';
 import { useConfetti } from '@/hooks/useConfetti';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Lesson() {
   const { unitId } = useParams();
@@ -40,6 +41,24 @@ export default function Lesson() {
     description: string;
   }>({ open: false, title: '', description: '' });
 
+  // Track if user has interacted with current lesson (viewed video, notes, or quiz)
+  const hasInteracted = useRef(false);
+  const currentLessonRef = useRef<string | null>(null);
+  const userIdRef = useRef<string | undefined>(undefined);
+
+  // Update refs when values change
+  useEffect(() => {
+    currentLessonRef.current = currentLesson?.id || null;
+    userIdRef.current = user?.id;
+  }, [currentLesson?.id, user?.id]);
+
+  // Mark interaction when user views content
+  useEffect(() => {
+    if (currentLesson?.id) {
+      hasInteracted.current = true;
+    }
+  }, [currentLesson?.id, activeTab]);
+
   // Get completed lessons from database
   const completedLessons = useMemo(() => {
     if (!lessonProgress || !lessons) return [];
@@ -48,6 +67,78 @@ export default function Lesson() {
       .filter(p => lessonIds.includes(p.lesson_id))
       .map(p => p.lesson_id);
   }, [lessonProgress, lessons]);
+
+  // Function to save progress directly (for beforeunload)
+  const saveProgressSync = useCallback(() => {
+    const lessonId = currentLessonRef.current;
+    const userId = userIdRef.current;
+    
+    if (!lessonId || !userId || !hasInteracted.current) return;
+    
+    // Check if already completed
+    const isCompleted = lessonProgress?.some(p => p.lesson_id === lessonId);
+    if (isCompleted) return;
+
+    // Use navigator.sendBeacon for reliable save on page unload
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/lesson_progress`;
+    const data = JSON.stringify({
+      lesson_id: lessonId,
+      user_id: userId,
+      completed: true,
+      completed_at: new Date().toISOString()
+    });
+    
+    navigator.sendBeacon(url + `?apikey=${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`, 
+      new Blob([data], { type: 'application/json' })
+    );
+  }, [lessonProgress]);
+
+  // Save progress when page is about to unload (close tab, refresh, navigate away)
+  useBeforeUnload(
+    useCallback(() => {
+      saveProgressSync();
+    }, [saveProgressSync])
+  );
+
+  // Also handle browser beforeunload event for more reliable saving
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveProgressSync();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Save progress when component unmounts (navigating to another route)
+      saveProgressSync();
+    };
+  }, [saveProgressSync]);
+
+  // Mark current lesson as complete
+  const markCurrentLessonComplete = useCallback(async () => {
+    if (currentLesson && user?.id && !completedLessons.includes(currentLesson.id)) {
+      try {
+        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.id });
+        hasInteracted.current = false;
+        return true;
+      } catch {
+        toast.error('Failed to save progress');
+        return false;
+      }
+    }
+    return false;
+  }, [currentLesson, user?.id, completedLessons, markLessonComplete]);
+
+  // Save progress when lesson changes
+  useEffect(() => {
+    return () => {
+      // When lessonId changes, save progress for previous lesson
+      if (hasInteracted.current) {
+        markCurrentLessonComplete();
+        hasInteracted.current = false;
+      }
+    };
+  }, [lessonId, markCurrentLessonComplete]);
 
   // Trigger confetti and achievement modal when all lessons are completed
   useEffect(() => {
@@ -77,20 +168,6 @@ export default function Lesson() {
   const handleSelectLesson = (lesson: { id: string }) => {
     setSearchParams({ lesson: lesson.id });
     setActiveTab('content');
-  };
-
-  // Mark current lesson as complete
-  const markCurrentLessonComplete = async () => {
-    if (currentLesson && user?.id && !completedLessons.includes(currentLesson.id)) {
-      try {
-        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.id });
-        return true;
-      } catch {
-        toast.error('Failed to save progress');
-        return false;
-      }
-    }
-    return false;
   };
 
   const handleVideoComplete = async () => {
