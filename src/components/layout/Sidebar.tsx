@@ -46,7 +46,7 @@ const navItems = {
     { icon: CreditCard, label: "To'lovlar", path: '/admin/payments' },
     { icon: Shield, label: 'Qurilmalar', path: '/admin/devices' },
     { icon: CalendarCheck, label: 'Davomat', path: '/admin/attendance' },
-    { icon: BarChart3, label: 'Progress', path: '/admin/progress' },
+    { icon: BarChart3, label: 'Statistika', path: '/admin/statistics' },
     { icon: Settings, label: 'Sozlamalar', path: '/admin/settings' },
     { icon: User, label: 'Profil', path: '/profile' },
   ],
