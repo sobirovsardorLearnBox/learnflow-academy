@@ -607,6 +607,17 @@ export type Database = {
         Args: { p_quiz_id: string; p_selected_answer: number }
         Returns: Json
       }
+      get_group_leaderboard: {
+        Args: { group_id_param: string }
+        Returns: {
+          avatar_url: string
+          completed_lessons: number
+          completed_units: number
+          last_activity: string
+          name: string
+          user_id: string
+        }[]
+      }
       get_quiz_questions: {
         Args: { p_lesson_id: string }
         Returns: {
@@ -620,6 +631,17 @@ export type Database = {
           question: string
           question_order: number
           updated_at: string
+        }[]
+      }
+      get_student_leaderboard: {
+        Args: { limit_count?: number }
+        Returns: {
+          avatar_url: string
+          completed_lessons: number
+          completed_units: number
+          last_activity: string
+          name: string
+          user_id: string
         }[]
       }
       get_user_payment_status: {

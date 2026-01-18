@@ -13,6 +13,7 @@ import Payment from "./pages/Payment";
 import Profile from "./pages/Profile";
 import Lesson from "./pages/Lesson";
 import Statistics from "./pages/Statistics";
+import Leaderboard from "./pages/Leaderboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminSections from "./pages/admin/AdminSections";
@@ -103,6 +104,12 @@ function AppRoutes() {
       <Route path="/statistics" element={
         <ProtectedRoute allowedRoles={['student']}>
           <Statistics />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/leaderboard" element={
+        <ProtectedRoute allowedRoles={['student']}>
+          <Leaderboard />
         </ProtectedRoute>
       } />
 
