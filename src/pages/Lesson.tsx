@@ -79,28 +79,30 @@ export default function Lesson() {
     setActiveTab('content');
   };
 
-  const handleVideoComplete = async () => {
+  // Mark current lesson as complete
+  const markCurrentLessonComplete = async () => {
     if (currentLesson && user?.id && !completedLessons.includes(currentLesson.id)) {
       try {
         await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.id });
-        toast.success('Lesson completed!');
+        return true;
       } catch {
         toast.error('Failed to save progress');
+        return false;
       }
+    }
+    return false;
+  };
+
+  const handleVideoComplete = async () => {
+    const saved = await markCurrentLessonComplete();
+    if (saved) {
+      toast.success('Lesson completed!');
     }
   };
 
   const handleQuizComplete = async (score: number, total: number) => {
-    if (currentLesson && user?.id && !completedLessons.includes(currentLesson.id)) {
-      try {
-        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.id });
-        toast.success(`Quiz completed! Score: ${score}/${total}`);
-      } catch {
-        toast.error('Failed to save progress');
-      }
-    } else {
-      toast.success(`Quiz completed! Score: ${score}/${total}`);
-    }
+    await markCurrentLessonComplete();
+    toast.success(`Quiz completed! Score: ${score}/${total}`);
   };
 
   const handleMarkUnitComplete = async () => {
@@ -117,14 +119,18 @@ export default function Lesson() {
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < (lessons?.length ?? 0) - 1;
 
-  const goToPrev = () => {
+  const goToPrev = async () => {
     if (lessons && hasPrev) {
+      // Save progress before navigating
+      await markCurrentLessonComplete();
       setSearchParams({ lesson: lessons[currentIndex - 1].id });
     }
   };
 
-  const goToNext = () => {
+  const goToNext = async () => {
     if (lessons && hasNext) {
+      // Save progress before navigating
+      await markCurrentLessonComplete();
       setSearchParams({ lesson: lessons[currentIndex + 1].id });
     }
   };
