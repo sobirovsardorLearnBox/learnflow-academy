@@ -12,6 +12,7 @@ import MyCourses from "./pages/MyCourses";
 import Payment from "./pages/Payment";
 import Profile from "./pages/Profile";
 import Lesson from "./pages/Lesson";
+import Statistics from "./pages/Statistics";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminSections from "./pages/admin/AdminSections";
@@ -96,6 +97,12 @@ function AppRoutes() {
       <Route path="/payment" element={
         <ProtectedRoute allowedRoles={['student']}>
           <Payment />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/statistics" element={
+        <ProtectedRoute allowedRoles={['student']}>
+          <Statistics />
         </ProtectedRoute>
       } />
 
