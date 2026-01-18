@@ -16,6 +16,7 @@ import {
   User,
   UsersRound,
   CalendarCheck,
+  Trophy,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const navItems = {
   student: [
     { icon: GraduationCap, label: 'Kurslarim', path: '/courses' },
     { icon: BarChart3, label: 'Statistika', path: '/statistics' },
+    { icon: Trophy, label: 'Reyting', path: '/leaderboard' },
     { icon: CreditCard, label: "To'lov", path: '/payment' },
     { icon: User, label: 'Profil', path: '/profile' },
   ],
