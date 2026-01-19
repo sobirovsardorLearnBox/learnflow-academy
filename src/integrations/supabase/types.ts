@@ -607,6 +607,18 @@ export type Database = {
         Args: { p_quiz_id: string; p_selected_answer: number }
         Returns: Json
       }
+      get_dashboard_stats: {
+        Args: never
+        Returns: {
+          active_students_today: number
+          active_students_week: number
+          total_groups: number
+          total_lessons: number
+          total_students: number
+          total_teachers: number
+          total_units: number
+        }[]
+      }
       get_group_leaderboard: {
         Args: { group_id_param: string }
         Returns: {
@@ -615,6 +627,22 @@ export type Database = {
           completed_units: number
           last_activity: string
           name: string
+          user_id: string
+        }[]
+      }
+      get_group_leaderboard_optimized: {
+        Args: {
+          group_id_param: string
+          limit_count?: number
+          offset_count?: number
+        }
+        Returns: {
+          avatar_url: string
+          completed_lessons: number
+          completed_units: number
+          last_activity: string
+          name: string
+          rank: number
           user_id: string
         }[]
       }
@@ -644,10 +672,23 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_student_leaderboard_optimized: {
+        Args: { limit_count?: number; offset_count?: number }
+        Returns: {
+          avatar_url: string
+          completed_lessons: number
+          completed_units: number
+          last_activity: string
+          name: string
+          rank: number
+          user_id: string
+        }[]
+      }
       get_user_payment_status: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["payment_status"]
       }
+      get_user_rank: { Args: { target_user_id: string }; Returns: number }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
