@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.setup-first-admin]
 verify_jwt = false
+
+[functions.api-gateway]
+verify_jwt = false
