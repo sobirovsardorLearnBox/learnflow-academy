@@ -56,9 +56,7 @@ export function QuizComponent({ questions, onComplete, onRetry, minPassPercentag
       setLastAnswerCorrect(isCorrect);
       setRevealedCorrectAnswer(currentQuestion.correctAnswer);
       setRevealedExplanation(currentQuestion.explanation || null);
-      if (isCorrect) {
-        setScore(prev => prev + 1);
-      }
+      // Don't update score here - it will be updated in handleNextQuestion
     } else {
       // Student mode - validate server-side
       try {
@@ -71,9 +69,7 @@ export function QuizComponent({ questions, onComplete, onRetry, minPassPercentag
         setLastAnswerCorrect(result.is_correct);
         setRevealedCorrectAnswer(result.correct_answer);
         setRevealedExplanation(result.explanation);
-        if (result.is_correct) {
-          setScore(prev => prev + 1);
-        }
+        // Don't update score here - it will be updated in handleNextQuestion
       } catch (error) {
         console.error('Failed to validate answer:', error);
       }
@@ -81,7 +77,13 @@ export function QuizComponent({ questions, onComplete, onRetry, minPassPercentag
   };
 
   const handleNextQuestion = () => {
+    // Update score for the last answered question before moving on
+    const updatedScore = lastAnswerCorrect ? score + 1 : score;
+    
     if (currentIndex < questions.length - 1) {
+      if (lastAnswerCorrect) {
+        setScore(updatedScore);
+      }
       setCurrentIndex(prev => prev + 1);
       setSelectedAnswer(null);
       setIsAnswered(false);
@@ -89,10 +91,10 @@ export function QuizComponent({ questions, onComplete, onRetry, minPassPercentag
       setRevealedCorrectAnswer(null);
       setRevealedExplanation(null);
     } else {
+      // Final question - calculate and report score
       setIsCompleted(true);
-      const finalScore = score + (lastAnswerCorrect ? 1 : 0);
-      const quizPercentage = Math.round((finalScore / questions.length) * 100);
-      onComplete?.(finalScore, questions.length, quizPercentage);
+      const quizPercentage = Math.round((updatedScore / questions.length) * 100);
+      onComplete?.(updatedScore, questions.length, quizPercentage);
     }
   };
 
@@ -109,8 +111,8 @@ export function QuizComponent({ questions, onComplete, onRetry, minPassPercentag
   };
 
   if (isCompleted) {
-    const finalScore = score;
-    const quizPercentage = Math.round((finalScore / questions.length) * 100);
+    // Score is already finalized in handleNextQuestion
+    const quizPercentage = Math.round((score / questions.length) * 100);
     // Quiz contributes 80% of total score
     const quizPoints = Math.round((quizPercentage / 100) * 80);
     // Video is 20 points, so total minimum for 80% is video(20) + quiz(64) = 84
@@ -149,7 +151,7 @@ export function QuizComponent({ questions, onComplete, onRetry, minPassPercentag
             <div>
               <p className="text-4xl font-bold text-primary">{totalScoreWithVideo}/100</p>
               <p className="text-muted-foreground">
-                {finalScore} ta to'g'ri javob ({questions.length} tadan)
+                {score} ta to'g'ri javob ({questions.length} tadan)
               </p>
               <p className="text-sm text-muted-foreground mt-2">
                 Video: 20 ball + Test: {quizPoints} ball
