@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Code, BookOpen, Languages, Shield, Loader2, Lock, Users } from 'lucide-react';
+import { ArrowLeft, Code, BookOpen, Languages, Shield, Loader2, Users } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SectionCard } from '@/components/dashboard/SectionCard';
 import { LevelCard } from '@/components/dashboard/LevelCard';
@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSections, useLevels, useUnits, Section, Level } from '@/hooks/useSections';
+import { useLevels, useUnits, Section, Level } from '@/hooks/useSections';
 import { useUnitProgress } from '@/hooks/useLessons';
-import { useUserAccessibleUnits, useUserAccessibleSections } from '@/hooks/useGroupSections';
+import { useUserAccessibleUnits } from '@/hooks/useGroupSections';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfetti } from '@/hooks/useConfetti';
@@ -207,10 +207,10 @@ export default function MyCourses() {
 
   const { data: levels, isLoading: levelsLoading } = useLevels(selectedSection?.id);
   const { data: units, isLoading: unitsLoading } = useUnits(selectedLevel?.id);
-  const { data: accessibleUnitIds } = useUserAccessibleUnits(user?.id);
+  const { data: accessibleUnitIds } = useUserAccessibleUnits(user?.user_id);
   
   const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
-  const { data: unitProgress } = useUnitProgress(unitIds, user?.id);
+  const { data: unitProgress } = useUnitProgress(unitIds, user?.user_id);
 
   // Fetch level progress for all levels in selected section
   const { data: levelProgressData } = useQuery({
