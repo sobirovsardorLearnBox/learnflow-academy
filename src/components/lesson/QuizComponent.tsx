@@ -17,7 +17,7 @@ interface QuizQuestion {
 
 interface QuizComponentProps {
   questions: QuizQuestion[];
-  onComplete?: (score: number, total: number) => void;
+  onComplete?: (score: number, total: number, percentage: number) => void;
 }
 
 export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
@@ -88,7 +88,9 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
       setRevealedExplanation(null);
     } else {
       setIsCompleted(true);
-      onComplete?.(score + (lastAnswerCorrect ? 1 : 0), questions.length);
+      const finalScore = score + (lastAnswerCorrect ? 1 : 0);
+      const quizPercentage = Math.round((finalScore / questions.length) * 100);
+      onComplete?.(finalScore, questions.length, quizPercentage);
     }
   };
 
@@ -105,8 +107,10 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
 
   if (isCompleted) {
     const finalScore = score;
-    const percentage = Math.round((finalScore / questions.length) * 100);
-    const isPassed = percentage >= 70;
+    const quizPercentage = Math.round((finalScore / questions.length) * 100);
+    // Quiz contributes 80% of total score
+    const quizPoints = Math.round((quizPercentage / 100) * 80);
+    const isPassed = quizPercentage >= 70;
 
     return (
       <motion.div
@@ -131,20 +135,23 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
               )}
             </motion.div>
             <CardTitle className="text-2xl">
-              {isPassed ? "Congratulations!" : "Keep Practicing!"}
+              {isPassed ? "Tabriklaymiz!" : "Yana urinib ko'ring!"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <p className="text-4xl font-bold text-primary">{percentage}%</p>
+              <p className="text-4xl font-bold text-primary">{quizPoints}/80</p>
               <p className="text-muted-foreground">
-                {finalScore} out of {questions.length} correct
+                {finalScore} ta to'g'ri javob ({questions.length} tadan)
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Test uchun: {quizPoints} ball (80% dan)
               </p>
             </div>
             <div className="flex gap-3 justify-center">
               <Button variant="outline" onClick={handleRetry}>
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Try Again
+                Qayta urinish
               </Button>
             </div>
           </CardContent>
@@ -162,10 +169,10 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">
-            Question {currentIndex + 1} of {questions.length}
+            Savol {currentIndex + 1} / {questions.length}
           </span>
           <span className="text-muted-foreground">
-            Score: {score}/{currentIndex}
+            To'g'ri: {score}/{currentIndex}
           </span>
         </div>
         <Progress value={progress} className="h-2" />
@@ -242,7 +249,7 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
                   className="mt-4 p-4 rounded-lg bg-secondary/50 border border-border"
                 >
                   <p className="text-sm text-muted-foreground">
-                    <strong>Explanation:</strong> {revealedExplanation || currentQuestion.explanation}
+                    <strong>Izoh:</strong> {revealedExplanation || currentQuestion.explanation}
                   </p>
                 </motion.div>
               )}
@@ -261,21 +268,21 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
             {checkAnswer.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Checking...
+                Tekshirilmoqda...
               </>
             ) : (
-              'Check Answer'
+              'Javobni tekshirish'
             )}
           </Button>
         ) : (
           <Button onClick={handleNextQuestion}>
             {currentIndex < questions.length - 1 ? (
               <>
-                Next Question
+                Keyingi savol
                 <ChevronRight className="w-4 h-4 ml-2" />
               </>
             ) : (
-              'See Results'
+              'Natijalarni ko\'rish'
             )}
           </Button>
         )}

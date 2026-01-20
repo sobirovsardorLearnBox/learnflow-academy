@@ -17,6 +17,7 @@ import { useLessons, useLesson, useQuizzes, useMarkLessonComplete, useMarkUnitCo
 import { useConfetti } from '@/hooks/useConfetti';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 export default function Lesson() {
   const { unitId } = useParams();
@@ -40,6 +41,10 @@ export default function Lesson() {
     title: string;
     description: string;
   }>({ open: false, title: '', description: '' });
+
+  // Score tracking: video = 20%, quiz = 80%
+  const [videoCompleted, setVideoCompleted] = useState(false);
+  const [quizScore, setQuizScore] = useState<{ score: number; total: number; percentage: number } | null>(null);
 
   // Track if user has interacted with current lesson (viewed video, notes, or quiz)
   const hasInteracted = useRef(false);
@@ -166,20 +171,30 @@ export default function Lesson() {
   }, [lessons, lessonId, setSearchParams]);
 
   const handleSelectLesson = (lesson: { id: string }) => {
+    // Reset scores when changing lesson
+    setVideoCompleted(false);
+    setQuizScore(null);
     setSearchParams({ lesson: lesson.id });
     setActiveTab('content');
   };
 
   const handleVideoComplete = async () => {
-    const saved = await markCurrentLessonComplete();
-    if (saved) {
-      toast.success('Dars tugatildi!');
+    if (!videoCompleted) {
+      setVideoCompleted(true);
+      toast.success('Video tugatildi! (+20 ball)');
     }
   };
 
-  const handleQuizComplete = async (score: number, total: number) => {
+  const handleQuizComplete = async (score: number, total: number, percentage: number) => {
+    setQuizScore({ score, total, percentage });
+    const quizPoints = Math.round((percentage / 100) * 80);
+    const videoPoints = videoCompleted ? 20 : 0;
+    const totalScore = videoPoints + quizPoints;
+    
+    // Mark lesson as complete after quiz
     await markCurrentLessonComplete();
-    toast.success(`Test yakunlandi! Natija: ${score}/${total}`);
+    
+    toast.success(`Test yakunlandi! Jami ball: ${totalScore}/100`);
   };
 
   const handleMarkUnitComplete = async () => {
@@ -322,6 +337,33 @@ export default function Lesson() {
                   <p className="text-muted-foreground mt-2">{currentLesson.description}</p>
                 )}
               </div>
+
+              {/* Score Progress Panel */}
+              <Card variant="glass" className="p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <Video className={cn("w-5 h-5", videoCompleted ? "text-emerald-500" : "text-muted-foreground")} />
+                      <span className={cn("text-sm font-medium", videoCompleted ? "text-emerald-500" : "text-muted-foreground")}>
+                        Video: {videoCompleted ? "20" : "0"}/20
+                      </span>
+                      {videoCompleted && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className={cn("w-5 h-5", quizScore ? "text-emerald-500" : "text-muted-foreground")} />
+                      <span className={cn("text-sm font-medium", quizScore ? "text-emerald-500" : "text-muted-foreground")}>
+                        Test: {quizScore ? Math.round((quizScore.percentage / 100) * 80) : "0"}/80
+                      </span>
+                      {quizScore && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-lg font-bold text-primary">
+                      Jami: {(videoCompleted ? 20 : 0) + (quizScore ? Math.round((quizScore.percentage / 100) * 80) : 0)}/100
+                    </span>
+                  </div>
+                </div>
+              </Card>
 
               {/* Content Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab}>
