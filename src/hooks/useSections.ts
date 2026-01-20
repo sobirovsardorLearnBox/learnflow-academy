@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { QUERY_STALE_TIMES, QUERY_GC_TIMES, queryKeys } from '@/lib/query-config';
 
 export interface Section {
   id: string;
@@ -30,7 +31,7 @@ export interface Unit {
 
 export function useSections() {
   return useQuery({
-    queryKey: ['sections'],
+    queryKey: queryKeys.sections(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sections')
@@ -41,12 +42,14 @@ export function useSections() {
       if (error) throw error;
       return data as Section[];
     },
+    staleTime: QUERY_STALE_TIMES.sections,
+    gcTime: QUERY_GC_TIMES.default,
   });
 }
 
 export function useLevels(sectionId?: string) {
   return useQuery({
-    queryKey: ['levels', sectionId],
+    queryKey: queryKeys.levels(sectionId),
     queryFn: async () => {
       let query = supabase
         .from('levels')
@@ -63,12 +66,14 @@ export function useLevels(sectionId?: string) {
       return data as Level[];
     },
     enabled: !!sectionId,
+    staleTime: QUERY_STALE_TIMES.levels,
+    gcTime: QUERY_GC_TIMES.default,
   });
 }
 
 export function useUnits(levelId?: string) {
   return useQuery({
-    queryKey: ['units', levelId],
+    queryKey: queryKeys.units(levelId),
     queryFn: async () => {
       let query = supabase
         .from('units')
@@ -85,5 +90,7 @@ export function useUnits(levelId?: string) {
       return data as Unit[];
     },
     enabled: !!levelId,
+    staleTime: QUERY_STALE_TIMES.units,
+    gcTime: QUERY_GC_TIMES.default,
   });
 }

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { QUERY_STALE_TIMES, QUERY_GC_TIMES, queryKeys, invalidationGroups } from '@/lib/query-config';
 
 export type Lesson = Tables<'lessons'>;
 export type Quiz = Tables<'quizzes'>;
@@ -16,7 +17,7 @@ export interface QuizQuestion {
 
 export const useLessons = (unitId?: string) => {
   return useQuery({
-    queryKey: ['lessons', unitId],
+    queryKey: queryKeys.lessons(unitId),
     queryFn: async () => {
       if (!unitId) return [];
       const { data, error } = await supabase
@@ -30,12 +31,14 @@ export const useLessons = (unitId?: string) => {
       return data as Lesson[];
     },
     enabled: !!unitId,
+    staleTime: QUERY_STALE_TIMES.lessons,
+    gcTime: QUERY_GC_TIMES.default,
   });
 };
 
 export const useLesson = (lessonId?: string) => {
   return useQuery({
-    queryKey: ['lesson', lessonId],
+    queryKey: queryKeys.lesson(lessonId),
     queryFn: async () => {
       if (!lessonId) return null;
       const { data, error } = await supabase
@@ -48,12 +51,14 @@ export const useLesson = (lessonId?: string) => {
       return data as Lesson | null;
     },
     enabled: !!lessonId,
+    staleTime: QUERY_STALE_TIMES.lessons,
+    gcTime: QUERY_GC_TIMES.default,
   });
 };
 
 export const useLessonProgress = (userId?: string) => {
   return useQuery({
-    queryKey: ['lesson_progress', userId],
+    queryKey: queryKeys.lessonProgress(userId),
     queryFn: async () => {
       if (!userId) return [];
       const { data, error } = await supabase
@@ -66,24 +71,27 @@ export const useLessonProgress = (userId?: string) => {
       return data as LessonProgress[];
     },
     enabled: !!userId,
+    staleTime: QUERY_STALE_TIMES.lessonProgress,
+    gcTime: QUERY_GC_TIMES.userSpecific,
   });
 };
 
 export const useUserStats = (userId?: string) => {
   return useQuery({
-    queryKey: ['user_stats', userId],
+    queryKey: queryKeys.userStats(userId),
     queryFn: async () => {
       if (!userId) return { completedLessons: 0, completedUnits: 0 };
       
+      // Use parallel queries with count for efficiency
       const [lessonsResult, unitsResult] = await Promise.all([
         supabase
           .from('lesson_progress')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
           .eq('completed', true),
         supabase
           .from('user_progress')
-          .select('id', { count: 'exact' })
+          .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
           .eq('completed', true),
       ]);
@@ -94,6 +102,8 @@ export const useUserStats = (userId?: string) => {
       };
     },
     enabled: !!userId,
+    staleTime: QUERY_STALE_TIMES.userStats,
+    gcTime: QUERY_GC_TIMES.userSpecific,
   });
 };
 
@@ -152,12 +162,14 @@ export const useUnitProgress = (unitIds: string[], userId?: string) => {
       return unitProgress;
     },
     enabled: !!userId && unitIds.length > 0,
+    staleTime: QUERY_STALE_TIMES.unitProgress,
+    gcTime: QUERY_GC_TIMES.userSpecific,
   });
 };
 
 export const useQuizzes = (lessonId?: string) => {
   return useQuery({
-    queryKey: ['quizzes', lessonId],
+    queryKey: queryKeys.quizzes(lessonId),
     queryFn: async () => {
       if (!lessonId) return [];
       // Use the secure RPC function that hides correct answers from students
@@ -176,6 +188,8 @@ export const useQuizzes = (lessonId?: string) => {
       })) as QuizQuestion[];
     },
     enabled: !!lessonId,
+    staleTime: QUERY_STALE_TIMES.lessons,
+    gcTime: QUERY_GC_TIMES.default,
   });
 };
 
