@@ -68,5 +68,18 @@ export function useConfetti() {
     }, 250);
   };
 
-  return { triggerConfetti, triggerSuccessConfetti };
+  // Small celebration for individual lesson completion (80%+)
+  const triggerLessonConfetti = () => {
+    confetti({
+      particleCount: 60,
+      spread: 55,
+      origin: { y: 0.7 },
+      colors: ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7'],
+      ticks: 100,
+      gravity: 1.2,
+      scalar: 0.9
+    });
+  };
+
+  return { triggerConfetti, triggerSuccessConfetti, triggerLessonConfetti };
 }
