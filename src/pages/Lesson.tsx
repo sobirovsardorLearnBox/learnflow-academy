@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, useBeforeUnload } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, BookOpen, Video, FileText, HelpCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, BookOpen, Video, FileText, HelpCircle, CheckCircle2, ChevronLeft, ChevronRight, Lock, AlertCircle, Calendar } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { VideoPlayer } from '@/components/lesson/VideoPlayer';
@@ -11,9 +11,11 @@ import { AchievementModal } from '@/components/achievement/AchievementModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLessons, useLesson, useQuizzes, useMarkLessonComplete, useMarkUnitComplete, useLessonProgress } from '@/hooks/useLessons';
+import { useLessons, useLesson, useQuizzes, useMarkLessonComplete, useMarkUnitComplete, useLessonProgress, useLessonScores } from '@/hooks/useLessons';
+import { useLessonAccess, useDailyLessonLimit } from '@/hooks/useLessonAccess';
 import { useConfetti } from '@/hooks/useConfetti';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +32,9 @@ export default function Lesson() {
   const { data: currentLesson, isLoading: lessonLoading } = useLesson(lessonId || undefined);
   const { data: quizQuestions, isLoading: quizLoading } = useQuizzes(lessonId || undefined);
   const { data: lessonProgress } = useLessonProgress(user?.user_id);
+  const { data: lessonScoresData } = useLessonScores(user?.user_id);
+  const { data: lessonAccess, isLoading: accessLoading } = useLessonAccess(lessonId || undefined);
+  const { data: dailyLimit } = useDailyLessonLimit();
   const markLessonComplete = useMarkLessonComplete();
   const markUnitComplete = useMarkUnitComplete();
   const { triggerSuccessConfetti } = useConfetti();
@@ -72,6 +77,15 @@ export default function Lesson() {
       .filter(p => lessonIds.includes(p.lesson_id))
       .map(p => p.lesson_id);
   }, [lessonProgress, lessons]);
+
+  // Get lesson scores as a map
+  const lessonScores = useMemo(() => {
+    if (!lessonScoresData) return {};
+    return lessonScoresData.reduce((acc, progress) => {
+      acc[progress.lesson_id] = progress.score || 0;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [lessonScoresData]);
 
   // Function to save progress directly (for beforeunload)
   const saveProgressSync = useCallback(() => {
@@ -199,6 +213,12 @@ export default function Lesson() {
   };
 
   const handleQuizComplete = async (score: number, total: number, percentage: number) => {
+    // Check if user can complete today (daily limit)
+    if (dailyLimit && !dailyLimit.can_complete) {
+      toast.error(`Bugun 1 ta dars limiti tugagan. Ertaga qaytib keling!`);
+      return;
+    }
+    
     setQuizScore({ score, total, percentage });
     const quizPoints = Math.round((percentage / 100) * 80);
     const videoPoints = videoCompleted ? 20 : 0;
@@ -293,6 +313,7 @@ export default function Lesson() {
                 lessons={lessons}
                 currentLessonId={lessonId || undefined}
                 completedLessons={completedLessons}
+                lessonScores={lessonScores}
                 onSelectLesson={handleSelectLesson}
               />
               
@@ -338,6 +359,36 @@ export default function Lesson() {
             </div>
           ) : currentLesson ? (
             <div className="space-y-6">
+              {/* Access Restriction Alert */}
+              {lessonAccess && !lessonAccess.can_access && (
+                <Alert variant="destructive">
+                  <Lock className="h-4 w-4" />
+                  <AlertTitle>Dars qulflangan</AlertTitle>
+                  <AlertDescription>
+                    {lessonAccess.reason === 'previous_lesson_not_completed' && 
+                      "Oldingi darsni tugatishingiz kerak."
+                    }
+                    {lessonAccess.reason === 'previous_video_not_watched' && 
+                      "Oldingi darsning videosini to'liq ko'rishingiz kerak."
+                    }
+                    {lessonAccess.reason === 'previous_score_too_low' && 
+                      `Oldingi darsda kamida 80% ball olishingiz kerak. Hozirgi: ${lessonAccess.current_score}%`
+                    }
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Daily Limit Warning */}
+              {dailyLimit && !dailyLimit.can_complete && (
+                <Alert className="border-amber-500/50 bg-amber-500/10">
+                  <Calendar className="h-4 w-4 text-amber-500" />
+                  <AlertTitle className="text-amber-600">Kunlik limit</AlertTitle>
+                  <AlertDescription className="text-amber-600">
+                    Bugun 1 ta dars tugatish limiti tugagan. Yangi darsni ertaga tugatishingiz mumkin.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Lesson Header */}
               <div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">

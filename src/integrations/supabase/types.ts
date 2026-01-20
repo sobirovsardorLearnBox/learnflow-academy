@@ -681,6 +681,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_complete_lesson_today: { Args: { p_user_id: string }; Returns: Json }
+      check_lesson_access: {
+        Args: { p_lesson_id: string; p_user_id: string }
+        Returns: Json
+      }
       check_notification_preference: {
         Args: { p_notification_type: string; p_user_id: string }
         Returns: boolean
