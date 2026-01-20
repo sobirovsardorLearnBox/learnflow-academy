@@ -7,13 +7,109 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 }
 
+// Redis configuration
+const REDIS_URL = Deno.env.get('UPSTASH_REDIS_REST_URL') || ''
+const REDIS_TOKEN = Deno.env.get('UPSTASH_REDIS_REST_TOKEN') || ''
+const REDIS_ENABLED = !!(REDIS_URL && REDIS_TOKEN)
+
+// Redis helper functions
+async function redisExecute<T = unknown>(command: string[]): Promise<T | null> {
+  if (!REDIS_ENABLED) return null
+
+  try {
+    const response = await fetch(REDIS_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${REDIS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(command),
+    })
+
+    if (!response.ok) {
+      console.error(`Redis error: ${response.status}`)
+      return null
+    }
+
+    const data = await response.json()
+    return data.result as T
+  } catch (error) {
+    console.error('Redis request failed:', error)
+    return null
+  }
+}
+
+async function redisGet<T>(key: string): Promise<T | null> {
+  const result = await redisExecute<string | null>(['GET', key])
+  if (result === null) return null
+  try {
+    return JSON.parse(result) as T
+  } catch {
+    return null
+  }
+}
+
+async function redisSet(key: string, value: unknown, ttlSeconds: number): Promise<boolean> {
+  const result = await redisExecute(['SET', key, JSON.stringify(value), 'EX', String(ttlSeconds)])
+  return result !== null
+}
+
+async function redisIncrWithTTL(key: string, ttlSeconds: number): Promise<number> {
+  try {
+    const response = await fetch(`${REDIS_URL}/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${REDIS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['INCR', key],
+        ['EXPIRE', key, String(ttlSeconds)]
+      ]),
+    })
+
+    if (!response.ok) return 0
+    const results = await response.json()
+    return results[0]?.result || 0
+  } catch {
+    return 0
+  }
+}
+
+async function redisInvalidatePattern(pattern: string): Promise<number> {
+  try {
+    let cursor = '0'
+    let deleted = 0
+    
+    do {
+      const result = await redisExecute<[string, string[]]>(['SCAN', cursor, 'MATCH', pattern, 'COUNT', '100'])
+      if (!result) break
+      
+      const [newCursor, keys] = result
+      cursor = newCursor
+      
+      if (keys.length > 0) {
+        await redisExecute(['DEL', ...keys])
+        deleted += keys.length
+      }
+    } while (cursor !== '0')
+    
+    return deleted
+  } catch {
+    return 0
+  }
+}
+
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60000 // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 100 // requests per window
 const RATE_LIMIT_STRICT_MAX = 10 // for sensitive endpoints
 
-// In-memory rate limit store (resets on cold start, but effective for hot instances)
+// In-memory fallback rate limit store
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
+
+// In-memory fallback cache
+const memoryCache = new Map<string, { data: unknown; expiry: number }>()
 
 // Request logging
 interface RequestLog {
@@ -25,6 +121,8 @@ interface RequestLog {
   duration?: number
   status?: number
   error?: string
+  cached?: boolean
+  cacheType?: 'redis' | 'memory'
 }
 
 function logRequest(log: RequestLog) {
@@ -46,24 +144,44 @@ function logError(message: string, error: unknown, context?: Record<string, unkn
   }))
 }
 
-// Rate limiting function
-function checkRateLimit(identifier: string, isStrict = false): { allowed: boolean; remaining: number; resetIn: number } {
-  const now = Date.now()
+// Rate limiting function with Redis support
+async function checkRateLimit(identifier: string, isStrict = false): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
   const maxRequests = isStrict ? RATE_LIMIT_STRICT_MAX : RATE_LIMIT_MAX_REQUESTS
+  const windowSeconds = 60
   
+  // Try Redis first
+  if (REDIS_ENABLED) {
+    const now = Math.floor(Date.now() / 1000)
+    const windowKey = `ratelimit:${identifier}:${Math.floor(now / windowSeconds)}`
+    
+    const count = await redisIncrWithTTL(windowKey, windowSeconds)
+    if (count > 0) {
+      const remaining = Math.max(0, maxRequests - count)
+      const resetIn = windowSeconds - (now % windowSeconds)
+      
+      return {
+        allowed: count <= maxRequests,
+        remaining,
+        resetIn
+      }
+    }
+  }
+  
+  // Fallback to in-memory
+  const now = Date.now()
   const record = rateLimitStore.get(identifier)
   
   if (!record || now > record.resetTime) {
     rateLimitStore.set(identifier, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS })
-    return { allowed: true, remaining: maxRequests - 1, resetIn: RATE_LIMIT_WINDOW_MS }
+    return { allowed: true, remaining: maxRequests - 1, resetIn: 60 }
   }
   
   if (record.count >= maxRequests) {
-    return { allowed: false, remaining: 0, resetIn: record.resetTime - now }
+    return { allowed: false, remaining: 0, resetIn: Math.ceil((record.resetTime - now) / 1000) }
   }
   
   record.count++
-  return { allowed: true, remaining: maxRequests - record.count, resetIn: record.resetTime - now }
+  return { allowed: true, remaining: maxRequests - record.count, resetIn: Math.ceil((record.resetTime - now) / 1000) }
 }
 
 // Input validation helpers
@@ -117,7 +235,7 @@ function errorResponse(status: number, message: string, details?: unknown) {
 }
 
 // Success response helper
-function successResponse(data: unknown, status = 200) {
+function successResponse(data: unknown, status = 200, extraHeaders?: Record<string, string>) {
   return new Response(
     JSON.stringify({
       success: true,
@@ -126,25 +244,55 @@ function successResponse(data: unknown, status = 200) {
     }),
     { 
       status, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, ...extraHeaders, 'Content-Type': 'application/json' }
     }
   )
 }
 
-// Cache store for expensive queries
-const cache = new Map<string, { data: unknown; expiry: number }>()
-
-function getCached<T>(key: string): T | null {
-  const cached = cache.get(key)
-  if (!cached || Date.now() > cached.expiry) {
-    cache.delete(key)
-    return null
+// Multi-layer cache getter
+async function getCached<T>(key: string): Promise<{ data: T | null; source: 'redis' | 'memory' | null }> {
+  // Try Redis first
+  if (REDIS_ENABLED) {
+    const redisData = await redisGet<T>(key)
+    if (redisData !== null) {
+      return { data: redisData, source: 'redis' }
+    }
   }
-  return cached.data as T
+  
+  // Fallback to memory cache
+  const memData = memoryCache.get(key)
+  if (memData && Date.now() <= memData.expiry) {
+    return { data: memData.data as T, source: 'memory' }
+  }
+  
+  memoryCache.delete(key)
+  return { data: null, source: null }
 }
 
-function setCache(key: string, data: unknown, ttlMs: number) {
-  cache.set(key, { data, expiry: Date.now() + ttlMs })
+// Multi-layer cache setter
+async function setCache(key: string, data: unknown, ttlSeconds: number): Promise<void> {
+  // Set in Redis if available
+  if (REDIS_ENABLED) {
+    await redisSet(key, data, ttlSeconds)
+  }
+  
+  // Also set in memory cache as fallback
+  memoryCache.set(key, { data, expiry: Date.now() + (ttlSeconds * 1000) })
+}
+
+// Invalidate cache pattern
+async function invalidateCache(pattern: string): Promise<void> {
+  // Redis invalidation
+  if (REDIS_ENABLED) {
+    await redisInvalidatePattern(pattern)
+  }
+  
+  // Memory cache invalidation
+  for (const key of memoryCache.keys()) {
+    if (key.includes(pattern.replace('*', ''))) {
+      memoryCache.delete(key)
+    }
+  }
 }
 
 // Main handler
@@ -215,7 +363,7 @@ Deno.serve(async (req) => {
     // Rate limiting - use userId if authenticated, otherwise IP
     const rateLimitKey = userId || clientIP
     const isStrictEndpoint = path.includes('/admin') || path.includes('/create') || path.includes('/delete')
-    const rateLimit = checkRateLimit(rateLimitKey, isStrictEndpoint)
+    const rateLimit = await checkRateLimit(rateLimitKey, isStrictEndpoint)
     
     if (!rateLimit.allowed) {
       logRequest({ ...requestLog, status: 429, duration: Date.now() - startTime })
@@ -223,16 +371,16 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: false,
           error: 'Rate limit exceeded',
-          retryAfter: Math.ceil(rateLimit.resetIn / 1000)
+          retryAfter: rateLimit.resetIn
         }),
         { 
           status: 429, 
           headers: { 
             ...corsHeaders, 
             'Content-Type': 'application/json',
-            'Retry-After': String(Math.ceil(rateLimit.resetIn / 1000)),
+            'Retry-After': String(rateLimit.resetIn),
             'X-RateLimit-Remaining': String(rateLimit.remaining),
-            'X-RateLimit-Reset': String(Math.ceil(rateLimit.resetIn / 1000))
+            'X-RateLimit-Reset': String(rateLimit.resetIn)
           }
         }
       )
@@ -241,7 +389,7 @@ Deno.serve(async (req) => {
     // Add rate limit headers to all responses
     const rateLimitHeaders = {
       'X-RateLimit-Remaining': String(rateLimit.remaining),
-      'X-RateLimit-Reset': String(Math.ceil(rateLimit.resetIn / 1000)),
+      'X-RateLimit-Reset': String(rateLimit.resetIn),
       'X-Request-ID': requestId
     }
     
@@ -259,12 +407,12 @@ Deno.serve(async (req) => {
       
       // Check cache first
       const cacheKey = `leaderboard:${groupId || 'global'}:${limit}:${offset}`
-      const cached = getCached<unknown>(cacheKey)
-      if (cached) {
-        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
+      const cachedResult = await getCached<unknown>(cacheKey)
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined })
         return new Response(
-          JSON.stringify({ success: true, data: cached, cached: true, timestamp: new Date().toISOString() }),
-          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT', 'X-Cache-Source': cachedResult.source || 'unknown' } }
         )
       }
       
@@ -290,7 +438,7 @@ Deno.serve(async (req) => {
       }
       
       // Cache for 30 seconds
-      setCache(cacheKey, result, 30000)
+      await setCache(cacheKey, result, 30)
       
       logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
       return new Response(
@@ -328,11 +476,11 @@ Deno.serve(async (req) => {
       
       // Cache for 60 seconds
       const cacheKey = 'dashboard_stats'
-      const cached = getCached<unknown>(cacheKey)
-      if (cached) {
-        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
+      const cachedStats = await getCached<unknown>(cacheKey)
+      if (cachedStats.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedStats.source || undefined })
         return new Response(
-          JSON.stringify({ success: true, data: cached, cached: true, timestamp: new Date().toISOString() }),
+          JSON.stringify({ success: true, data: cachedStats.data, cached: true, timestamp: new Date().toISOString() }),
           { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
         )
       }
@@ -340,7 +488,7 @@ Deno.serve(async (req) => {
       const { data, error } = await supabaseClient.rpc('get_dashboard_stats')
       if (error) throw error
       
-      setCache(cacheKey, data, 60000)
+      await setCache(cacheKey, data, 60)
       
       logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
       return new Response(
@@ -353,10 +501,22 @@ Deno.serve(async (req) => {
     if (path === '/health' && method === 'GET') {
       const { error } = await supabaseClient.from('profiles').select('id').limit(1)
       
+      // Check Redis health
+      let redisStatus = 'not_configured'
+      if (REDIS_ENABLED) {
+        try {
+          await redisExecute(['PING'])
+          redisStatus = 'connected'
+        } catch {
+          redisStatus = 'error'
+        }
+      }
+      
       const health = {
         status: error ? 'degraded' : 'healthy',
         database: error ? 'error' : 'connected',
-        cache_size: cache.size,
+        redis: redisStatus,
+        memory_cache_size: memoryCache.size,
         rate_limit_entries: rateLimitStore.size,
         timestamp: new Date().toISOString()
       }
@@ -394,11 +554,7 @@ Deno.serve(async (req) => {
       if (error) throw error
       
       // Invalidate leaderboard cache
-      for (const [key] of cache) {
-        if (key.startsWith('leaderboard:')) {
-          cache.delete(key)
-        }
-      }
+      await invalidateCache('leaderboard:*')
       
       logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
       return successResponse({ synced: true })
