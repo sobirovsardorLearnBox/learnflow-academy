@@ -119,11 +119,24 @@ export default function Lesson() {
     };
   }, [saveProgressSync]);
 
-  // Mark current lesson as complete
-  const markCurrentLessonComplete = useCallback(async () => {
-    if (currentLesson && user?.user_id && !completedLessons.includes(currentLesson.id)) {
+  // Mark current lesson as complete with scores
+  const markCurrentLessonCompleteWithScore = useCallback(async (
+    videoComplete: boolean = false,
+    quizPercentage: number = 0
+  ) => {
+    if (currentLesson && user?.user_id) {
       try {
-        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.user_id });
+        const videoPoints = videoComplete ? 20 : 0;
+        const quizPoints = Math.round((quizPercentage / 100) * 80);
+        const totalScore = videoPoints + quizPoints;
+        
+        await markLessonComplete.mutateAsync({ 
+          lessonId: currentLesson.id, 
+          userId: user.user_id,
+          score: totalScore,
+          videoCompleted: videoComplete,
+          quizScore: quizPercentage
+        });
         hasInteracted.current = false;
         return true;
       } catch {
@@ -132,18 +145,18 @@ export default function Lesson() {
       }
     }
     return false;
-  }, [currentLesson, user?.user_id, completedLessons, markLessonComplete]);
+  }, [currentLesson, user?.user_id, markLessonComplete]);
 
   // Save progress when lesson changes
   useEffect(() => {
     return () => {
       // When lessonId changes, save progress for previous lesson
-      if (hasInteracted.current) {
-        markCurrentLessonComplete();
+      if (hasInteracted.current && videoCompleted) {
+        markCurrentLessonCompleteWithScore(videoCompleted, quizScore?.percentage || 0);
         hasInteracted.current = false;
       }
     };
-  }, [lessonId, markCurrentLessonComplete]);
+  }, [lessonId, markCurrentLessonCompleteWithScore, videoCompleted, quizScore]);
 
   // Trigger confetti and achievement modal when all lessons are completed
   useEffect(() => {
@@ -191,8 +204,8 @@ export default function Lesson() {
     const videoPoints = videoCompleted ? 20 : 0;
     const totalScore = videoPoints + quizPoints;
     
-    // Mark lesson as complete after quiz
-    await markCurrentLessonComplete();
+    // Mark lesson as complete with scores
+    await markCurrentLessonCompleteWithScore(videoCompleted, percentage);
     
     toast.success(`Test yakunlandi! Jami ball: ${totalScore}/100`);
   };
@@ -214,7 +227,9 @@ export default function Lesson() {
   const goToPrev = async () => {
     if (lessons && hasPrev) {
       // Save progress before navigating
-      await markCurrentLessonComplete();
+      if (videoCompleted || quizScore) {
+        await markCurrentLessonCompleteWithScore(videoCompleted, quizScore?.percentage || 0);
+      }
       setSearchParams({ lesson: lessons[currentIndex - 1].id });
     }
   };
@@ -222,7 +237,9 @@ export default function Lesson() {
   const goToNext = async () => {
     if (lessons && hasNext) {
       // Save progress before navigating
-      await markCurrentLessonComplete();
+      if (videoCompleted || quizScore) {
+        await markCurrentLessonCompleteWithScore(videoCompleted, quizScore?.percentage || 0);
+      }
       setSearchParams({ lesson: lessons[currentIndex + 1].id });
     }
   };

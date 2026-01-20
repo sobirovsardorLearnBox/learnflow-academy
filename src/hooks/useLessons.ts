@@ -253,7 +253,19 @@ export const useMarkLessonComplete = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ lessonId, userId }: { lessonId: string; userId: string }) => {
+    mutationFn: async ({ 
+      lessonId, 
+      userId, 
+      score = 0,
+      videoCompleted = false,
+      quizScore = 0 
+    }: { 
+      lessonId: string; 
+      userId: string; 
+      score?: number;
+      videoCompleted?: boolean;
+      quizScore?: number;
+    }) => {
       const { data: existing } = await supabase
         .from('lesson_progress')
         .select('*')
@@ -262,13 +274,22 @@ export const useMarkLessonComplete = () => {
         .maybeSingle();
       
       if (existing) {
-        if (!existing.completed) {
-          const { error } = await supabase
-            .from('lesson_progress')
-            .update({ completed: true, completed_at: new Date().toISOString() })
-            .eq('id', existing.id);
-          if (error) throw error;
-        }
+        // Update with new scores if higher
+        const newScore = Math.max(existing.score || 0, score);
+        const newVideoCompleted = existing.video_completed || videoCompleted;
+        const newQuizScore = Math.max(existing.quiz_score || 0, quizScore);
+        
+        const { error } = await supabase
+          .from('lesson_progress')
+          .update({ 
+            completed: true, 
+            completed_at: existing.completed_at || new Date().toISOString(),
+            score: newScore,
+            video_completed: newVideoCompleted,
+            quiz_score: newQuizScore
+          })
+          .eq('id', existing.id);
+        if (error) throw error;
       } else {
         const { error } = await supabase
           .from('lesson_progress')
@@ -276,7 +297,10 @@ export const useMarkLessonComplete = () => {
             lesson_id: lessonId, 
             user_id: userId, 
             completed: true, 
-            completed_at: new Date().toISOString() 
+            completed_at: new Date().toISOString(),
+            score,
+            video_completed: videoCompleted,
+            quiz_score: quizScore
           });
         if (error) throw error;
       }
@@ -285,7 +309,63 @@ export const useMarkLessonComplete = () => {
       queryClient.invalidateQueries({ queryKey: ['lesson_progress'] });
       queryClient.invalidateQueries({ queryKey: ['user_stats'] });
       queryClient.invalidateQueries({ queryKey: ['unit_progress'] });
+      queryClient.invalidateQueries({ queryKey: ['lesson_scores'] });
     },
+  });
+};
+
+// Hook to get lesson scores for statistics
+export const useLessonScores = (userId?: string) => {
+  return useQuery({
+    queryKey: ['lesson_scores', userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from('lesson_progress')
+        .select(`
+          *,
+          lessons:lesson_id (
+            id,
+            title,
+            unit_id,
+            units:unit_id (
+              id,
+              name
+            )
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('completed', true)
+        .order('completed_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+  });
+};
+
+// Hook to get average score
+export const useAverageScore = (userId?: string) => {
+  return useQuery({
+    queryKey: ['average_score', userId],
+    queryFn: async () => {
+      if (!userId) return { averageScore: 0, totalScore: 0, lessonCount: 0 };
+      const { data, error } = await supabase
+        .from('lesson_progress')
+        .select('score')
+        .eq('user_id', userId)
+        .eq('completed', true);
+      
+      if (error) throw error;
+      
+      const scores = data?.map(d => d.score || 0) || [];
+      const totalScore = scores.reduce((a, b) => a + b, 0);
+      const averageScore = scores.length > 0 ? Math.round(totalScore / scores.length) : 0;
+      
+      return { averageScore, totalScore, lessonCount: scores.length };
+    },
+    enabled: !!userId,
   });
 };
 
