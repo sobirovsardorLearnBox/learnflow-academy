@@ -28,7 +28,7 @@ export default function Lesson() {
   const { data: lessons, isLoading: lessonsLoading } = useLessons(unitId);
   const { data: currentLesson, isLoading: lessonLoading } = useLesson(lessonId || undefined);
   const { data: quizQuestions, isLoading: quizLoading } = useQuizzes(lessonId || undefined);
-  const { data: lessonProgress } = useLessonProgress(user?.id);
+  const { data: lessonProgress } = useLessonProgress(user?.user_id);
   const markLessonComplete = useMarkLessonComplete();
   const markUnitComplete = useMarkUnitComplete();
   const { triggerSuccessConfetti } = useConfetti();
@@ -49,8 +49,8 @@ export default function Lesson() {
   // Update refs when values change
   useEffect(() => {
     currentLessonRef.current = currentLesson?.id || null;
-    userIdRef.current = user?.id;
-  }, [currentLesson?.id, user?.id]);
+    userIdRef.current = user?.user_id;
+  }, [currentLesson?.id, user?.user_id]);
 
   // Mark interaction when user views content
   useEffect(() => {
@@ -116,18 +116,18 @@ export default function Lesson() {
 
   // Mark current lesson as complete
   const markCurrentLessonComplete = useCallback(async () => {
-    if (currentLesson && user?.id && !completedLessons.includes(currentLesson.id)) {
+    if (currentLesson && user?.user_id && !completedLessons.includes(currentLesson.id)) {
       try {
-        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.id });
+        await markLessonComplete.mutateAsync({ lessonId: currentLesson.id, userId: user.user_id });
         hasInteracted.current = false;
         return true;
       } catch {
-        toast.error('Failed to save progress');
+        toast.error('Progressni saqlashda xatolik');
         return false;
       }
     }
     return false;
-  }, [currentLesson, user?.id, completedLessons, markLessonComplete]);
+  }, [currentLesson, user?.user_id, completedLessons, markLessonComplete]);
 
   // Save progress when lesson changes
   useEffect(() => {
@@ -173,22 +173,22 @@ export default function Lesson() {
   const handleVideoComplete = async () => {
     const saved = await markCurrentLessonComplete();
     if (saved) {
-      toast.success('Lesson completed!');
+      toast.success('Dars tugatildi!');
     }
   };
 
   const handleQuizComplete = async (score: number, total: number) => {
     await markCurrentLessonComplete();
-    toast.success(`Quiz completed! Score: ${score}/${total}`);
+    toast.success(`Test yakunlandi! Natija: ${score}/${total}`);
   };
 
   const handleMarkUnitComplete = async () => {
-    if (!unitId || !user?.id) return;
+    if (!unitId || !user?.user_id) return;
     try {
-      await markUnitComplete.mutateAsync({ unitId, userId: user.id });
-      toast.success('Unit marked as complete!');
+      await markUnitComplete.mutateAsync({ unitId, userId: user.user_id });
+      toast.success('Bo\'lim tugallandi deb belgilandi!');
     } catch {
-      toast.error('Failed to mark as complete');
+      toast.error('Belgilashda xatolik');
     }
   };
 
@@ -227,10 +227,10 @@ export default function Lesson() {
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center py-12 gap-4">
           <BookOpen className="w-16 h-16 text-muted-foreground" />
-          <p className="text-muted-foreground text-lg">No lessons available in this unit yet.</p>
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+          <p className="text-muted-foreground text-lg">Bu bo'limda hali darslar mavjud emas.</p>
+          <Button variant="outline" onClick={() => navigate('/courses')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
+            Kurslarga qaytish
           </Button>
         </div>
       </DashboardLayout>
@@ -252,10 +252,10 @@ export default function Lesson() {
                 variant="ghost" 
                 size="sm" 
                 className="mb-4 -ml-2"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/courses')}
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Units
+                Bo'limlarga qaytish
               </Button>
               <LessonNavigation
                 lessons={lessons}
@@ -267,7 +267,7 @@ export default function Lesson() {
               {/* Unit Progress */}
               <div className="mt-6 pt-4 border-t border-border">
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Progress</span>
+                  <span className="text-muted-foreground">Jarayon</span>
                   <span className="font-medium">
                     {completedLessons.length}/{lessons.length}
                   </span>
@@ -286,7 +286,7 @@ export default function Lesson() {
                     disabled={markUnitComplete.isPending}
                   >
                     <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Mark Unit Complete
+                    Bo'limni tugallash
                   </Button>
                 )}
               </div>
@@ -309,11 +309,11 @@ export default function Lesson() {
               {/* Lesson Header */}
               <div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <span>Lesson {currentLesson.lesson_number}</span>
+                  <span>{currentLesson.lesson_number}-dars</span>
                   {currentLesson.duration_minutes && (
                     <>
                       <span>•</span>
-                      <span>{currentLesson.duration_minutes} min</span>
+                      <span>{currentLesson.duration_minutes} daq</span>
                     </>
                   )}
                 </div>
@@ -332,11 +332,11 @@ export default function Lesson() {
                   </TabsTrigger>
                   <TabsTrigger value="notes" className="gap-2">
                     <FileText className="w-4 h-4" />
-                    <span className="hidden sm:inline">Notes</span>
+                    <span className="hidden sm:inline">Eslatmalar</span>
                   </TabsTrigger>
                   <TabsTrigger value="quiz" className="gap-2">
                     <HelpCircle className="w-4 h-4" />
-                    <span className="hidden sm:inline">Quiz</span>
+                    <span className="hidden sm:inline">Test</span>
                   </TabsTrigger>
                 </TabsList>
 
@@ -351,7 +351,7 @@ export default function Lesson() {
                     <Card variant="glass">
                       <CardContent className="flex flex-col items-center justify-center py-16">
                         <Video className="w-16 h-16 text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">No video available for this lesson</p>
+                        <p className="text-muted-foreground">Bu dars uchun video mavjud emas</p>
                       </CardContent>
                     </Card>
                   )}
@@ -360,7 +360,7 @@ export default function Lesson() {
                 <TabsContent value="notes" className="mt-6">
                   <Card variant="glass">
                     <CardHeader>
-                      <CardTitle>Lesson Notes</CardTitle>
+                      <CardTitle>Dars eslatmalari</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {currentLesson.content ? (
@@ -371,7 +371,7 @@ export default function Lesson() {
                       ) : (
                         <div className="flex flex-col items-center justify-center py-8">
                           <FileText className="w-12 h-12 text-muted-foreground mb-4" />
-                          <p className="text-muted-foreground">No notes available for this lesson</p>
+                          <p className="text-muted-foreground">Bu dars uchun eslatma mavjud emas</p>
                         </div>
                       )}
                     </CardContent>
@@ -392,7 +392,7 @@ export default function Lesson() {
                     <Card variant="glass">
                       <CardContent className="flex flex-col items-center justify-center py-16">
                         <HelpCircle className="w-16 h-16 text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">No quiz available for this lesson yet</p>
+                        <p className="text-muted-foreground">Bu dars uchun hali test mavjud emas</p>
                       </CardContent>
                     </Card>
                   )}
@@ -407,20 +407,20 @@ export default function Lesson() {
                   disabled={!hasPrev}
                 >
                   <ChevronLeft className="w-4 h-4 mr-2" />
-                  Previous
+                  Oldingi
                 </Button>
                 <Button
                   onClick={goToNext}
                   disabled={!hasNext}
                 >
-                  Next
+                  Keyingi
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">Select a lesson to begin</p>
+              <p className="text-muted-foreground">Boshlash uchun dars tanlang</p>
             </div>
           )}
         </motion.main>

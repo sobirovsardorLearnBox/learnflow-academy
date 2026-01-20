@@ -15,16 +15,16 @@ export function PaymentBanner({ status }: PaymentBannerProps) {
   const statusConfig = {
     pending: {
       icon: AlertTriangle,
-      title: 'Payment Pending',
-      description: 'Your payment is being reviewed. Content will be unlocked once approved.',
+      title: 'To\'lov kutilmoqda',
+      description: 'To\'lovingiz tekshirilmoqda. Tasdiqlangandan so\'ng kontentga kirish ochiladi.',
       color: 'from-warning/20 to-warning/10',
       borderColor: 'border-warning/30',
       iconColor: 'text-warning',
     },
     blocked: {
       icon: XCircle,
-      title: 'Account Blocked',
-      description: 'Your account has been blocked. Please contact admin to resolve.',
+      title: 'Akkaunt bloklangan',
+      description: 'Akkauntingiz bloklangan. Iltimos, admin bilan bog\'laning.',
       color: 'from-destructive/20 to-destructive/10',
       borderColor: 'border-destructive/30',
       iconColor: 'text-destructive',
@@ -51,7 +51,7 @@ export function PaymentBanner({ status }: PaymentBannerProps) {
             <p className="text-sm text-muted-foreground">{config.description}</p>
           </div>
           <div className="text-right space-y-2">
-            <p className="text-sm text-muted-foreground">Contact for payment:</p>
+            <p className="text-sm text-muted-foreground">To'lov uchun bog'laning:</p>
             <Button variant="outline" size="sm" asChild>
               <a href="https://t.me/config_player_admin" target="_blank" rel="noopener noreferrer">
                 <CreditCard className="w-4 h-4 mr-2" />
@@ -71,9 +71,9 @@ interface PaymentStatusBadgeProps {
 
 export function PaymentStatusBadge({ status }: PaymentStatusBadgeProps) {
   const config = {
-    approved: { icon: CheckCircle2, label: 'Approved', color: 'bg-success/20 text-success' },
-    pending: { icon: AlertTriangle, label: 'Pending', color: 'bg-warning/20 text-warning' },
-    blocked: { icon: XCircle, label: 'Blocked', color: 'bg-destructive/20 text-destructive' },
+    approved: { icon: CheckCircle2, label: 'Tasdiqlangan', color: 'bg-success/20 text-success' },
+    pending: { icon: AlertTriangle, label: 'Kutilmoqda', color: 'bg-warning/20 text-warning' },
+    blocked: { icon: XCircle, label: 'Bloklangan', color: 'bg-destructive/20 text-destructive' },
   };
 
   const { icon: Icon, label, color } = config[status];
