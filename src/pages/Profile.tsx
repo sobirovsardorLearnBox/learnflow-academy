@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Lock, Save, Loader2, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Lock, Save, Loader2, Eye, EyeOff, Bell, BookOpen, Trophy, CreditCard, MessageSquare } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
+  const { preferences, updatePreferences, isUpdating: isUpdatingPrefs } = useNotificationPreferences();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -29,6 +32,14 @@ export default function Profile() {
     newPassword: '',
     confirmPassword: '',
   });
+
+  const notificationTypes = [
+    { key: 'system_notifications', label: 'Tizim xabarlari', description: 'Tizim yangilanishlari va muhim e\'lonlar', icon: MessageSquare },
+    { key: 'new_lesson_notifications', label: 'Yangi darslar', description: 'Yangi darslar qo\'shilganda xabar', icon: BookOpen },
+    { key: 'reminder_notifications', label: 'Eslatmalar', description: 'O\'qituvchi eslatmalari va muhim sanalar', icon: Bell },
+    { key: 'achievement_notifications', label: 'Yutuqlar', description: 'Dars va bo\'lim tugatilganda xabar', icon: Trophy },
+    { key: 'payment_notifications', label: 'To\'lov xabarlari', description: 'To\'lov holati o\'zgarganda xabar', icon: CreditCard },
+  ] as const;
 
   if (!user) return null;
 
@@ -136,6 +147,10 @@ export default function Profile() {
               <User className="w-4 h-4" />
               Profil
             </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2">
+              <Bell className="w-4 h-4" />
+              Xabarnomalar
+            </TabsTrigger>
             <TabsTrigger value="security" className="gap-2">
               <Lock className="w-4 h-4" />
               Xavfsizlik
@@ -187,6 +202,41 @@ export default function Profile() {
                     )}
                     O'zgarishlarni saqlash
                   </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="notifications">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>Xabarnoma sozlamalari</CardTitle>
+                  <CardDescription>Qaysi turdagi xabarlarni olishni tanlang</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {notificationTypes.map(({ key, label, description, icon: Icon }) => (
+                    <div key={key} className="flex items-center justify-between gap-4 py-3 border-b last:border-0">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <Label htmlFor={key} className="font-medium cursor-pointer">{label}</Label>
+                          <p className="text-sm text-muted-foreground">{description}</p>
+                        </div>
+                      </div>
+                      <Switch
+                        id={key}
+                        checked={preferences[key as keyof typeof preferences] as boolean}
+                        onCheckedChange={(checked) => updatePreferences({ [key]: checked })}
+                        disabled={isUpdatingPrefs}
+                      />
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             </motion.div>

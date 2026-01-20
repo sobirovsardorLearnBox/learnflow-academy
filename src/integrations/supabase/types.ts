@@ -352,6 +352,42 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          achievement_notifications: boolean
+          created_at: string
+          id: string
+          new_lesson_notifications: boolean
+          payment_notifications: boolean
+          reminder_notifications: boolean
+          system_notifications: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_notifications?: boolean
+          created_at?: string
+          id?: string
+          new_lesson_notifications?: boolean
+          payment_notifications?: boolean
+          reminder_notifications?: boolean
+          system_notifications?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_notifications?: boolean
+          created_at?: string
+          id?: string
+          new_lesson_notifications?: boolean
+          payment_notifications?: boolean
+          reminder_notifications?: boolean
+          system_notifications?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -636,6 +672,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_notification_preference: {
+        Args: { p_notification_type: string; p_user_id: string }
+        Returns: boolean
+      }
       check_quiz_answer: {
         Args: { p_quiz_id: string; p_selected_answer: number }
         Returns: Json
