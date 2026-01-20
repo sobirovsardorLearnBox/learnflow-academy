@@ -11,6 +11,7 @@ export interface AdminUser {
   role: 'admin' | 'teacher' | 'student';
   paymentStatus: 'pending' | 'approved' | 'blocked';
   lastActive?: string;
+  daily_lesson_limit?: number;
 }
 
 export interface AdminPayment {
@@ -79,6 +80,7 @@ export function useAdminUsers() {
           avatar_url: profile.avatar_url,
           role: (userRole?.role as 'admin' | 'teacher' | 'student') || 'student',
           paymentStatus: (latestPayment?.status as 'pending' | 'approved' | 'blocked') || 'pending',
+          daily_lesson_limit: (profile as any).daily_lesson_limit ?? 1,
         };
       });
 

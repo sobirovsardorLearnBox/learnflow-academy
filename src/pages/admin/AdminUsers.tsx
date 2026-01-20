@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, MoreVertical, Shield, Trash2, Loader2, Users } from 'lucide-react';
+import { Search, MoreVertical, Shield, Trash2, Loader2, Users, Clock } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useAdminUsers, useUpdateUserRole, useDeleteUser } from '@/hooks/useAdminData';
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
+import { DailyLimitDialog } from '@/components/admin/DailyLimitDialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -39,7 +40,8 @@ export default function AdminUsers() {
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<{ id: string; user_id: string; name: string; role: string } | null>(null);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; user_id: string; name: string; role: string; daily_lesson_limit?: number } | null>(null);
   const [newRole, setNewRole] = useState<'admin' | 'teacher' | 'student'>('student');
 
   const { data: users, isLoading } = useAdminUsers();
@@ -101,6 +103,11 @@ export default function AdminUsers() {
   const handleOpenDeleteDialog = (user: typeof selectedUser) => {
     setSelectedUser(user);
     setDeleteDialogOpen(true);
+  };
+
+  const handleOpenLimitDialog = (user: typeof selectedUser) => {
+    setSelectedUser(user);
+    setLimitDialogOpen(true);
   };
 
   const handleRoleChange = () => {
@@ -215,6 +222,7 @@ export default function AdminUsers() {
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Foydalanuvchi</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Rol</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">Guruh</th>
+                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Kunlik limit</th>
                       <th className="text-left p-4 text-sm font-medium text-muted-foreground">To'lov</th>
                       <th className="text-right p-4 text-sm font-medium text-muted-foreground">Amallar</th>
                     </tr>
@@ -268,6 +276,26 @@ export default function AdminUsers() {
                           )}
                         </td>
                         <td className="p-4">
+                          {user.role === 'student' ? (
+                            <Badge 
+                              variant="outline" 
+                              className="cursor-pointer hover:bg-primary/10"
+                              onClick={() => handleOpenLimitDialog({
+                                id: user.id,
+                                user_id: user.user_id,
+                                name: user.name,
+                                role: user.role,
+                                daily_lesson_limit: user.daily_lesson_limit
+                              })}
+                            >
+                              <Clock className="w-3 h-3 mr-1" />
+                              {user.daily_lesson_limit ?? 1} dars/kun
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </td>
+                        <td className="p-4">
                           <PaymentStatusBadge status={user.paymentStatus} />
                         </td>
                         <td className="p-4 text-right">
@@ -283,19 +311,35 @@ export default function AdminUsers() {
                                   id: user.id,
                                   user_id: user.user_id,
                                   name: user.name,
-                                  role: user.role
+                                  role: user.role,
+                                  daily_lesson_limit: user.daily_lesson_limit
                                 })}
                               >
                                 <Shield className="w-4 h-4 mr-2" />
                                 Rolni o'zgartirish
                               </DropdownMenuItem>
+                              {user.role === 'student' && (
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenLimitDialog({
+                                    id: user.id,
+                                    user_id: user.user_id,
+                                    name: user.name,
+                                    role: user.role,
+                                    daily_lesson_limit: user.daily_lesson_limit
+                                  })}
+                                >
+                                  <Clock className="w-4 h-4 mr-2" />
+                                  Kunlik limitni o'zgartirish
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem 
                                 className="text-destructive"
                                 onClick={() => handleOpenDeleteDialog({
                                   id: user.id,
                                   user_id: user.user_id,
                                   name: user.name,
-                                  role: user.role
+                                  role: user.role,
+                                  daily_lesson_limit: user.daily_lesson_limit
                                 })}
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
@@ -361,6 +405,13 @@ export default function AdminUsers() {
         description={`${selectedUser?.name}ni o'chirishni tasdiqlaysizmi? Bu amalni qaytarib bo'lmaydi.`}
         onConfirm={handleDeleteUser}
         isLoading={deleteUser.isPending}
+      />
+
+      {/* Daily Limit Dialog */}
+      <DailyLimitDialog
+        open={limitDialogOpen}
+        onOpenChange={setLimitDialogOpen}
+        user={selectedUser}
       />
     </DashboardLayout>
   );
