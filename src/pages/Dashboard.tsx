@@ -7,6 +7,7 @@ import { SectionCard } from '@/components/dashboard/SectionCard';
 import { LevelCard } from '@/components/dashboard/LevelCard';
 import { UnitCard } from '@/components/dashboard/UnitCard';
 import { PaymentBanner } from '@/components/dashboard/PaymentBanner';
+import { DailyLimitWidget } from '@/components/dashboard/DailyLimitWidget';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -194,6 +195,13 @@ export default function Dashboard() {
               </Card>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Daily Limit Widget (only on sections view for students) */}
+      {view === 'sections' && user.role === 'student' && (
+        <div className="mb-8 max-w-sm">
+          <DailyLimitWidget />
         </div>
       )}
 
