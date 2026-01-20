@@ -1,18 +1,18 @@
 import { useState } from 'react';
-import { Bell, Check, CheckCheck, Trash2 } from 'lucide-react';
+import { Bell, CheckCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { useNotifications, Notification } from '@/hooks/useNotifications';
 import { formatDistanceToNow } from 'date-fns';
 import { uz } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 const notificationTypeColors: Record<string, string> = {
   lesson_completed: 'bg-green-500',
@@ -74,7 +74,10 @@ function NotificationItem({
 }
 
 export function NotificationBell() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  
+  // Only enable notifications when user is logged in
   const { 
     notifications, 
     unreadCount, 
@@ -84,7 +87,12 @@ export function NotificationBell() {
     clearAll,
     isMarkingAllAsRead,
     isClearing
-  } = useNotifications({ enabled: true, pollingInterval: 30000 });
+  } = useNotifications({ enabled: !!user, pollingInterval: 30000 });
+
+  // Don't render if no user
+  if (!user) {
+    return null;
+  }
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -111,8 +119,8 @@ export function NotificationBell() {
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
@@ -124,8 +132,8 @@ export function NotificationBell() {
             </Badge>
           )}
         </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h3 className="font-semibold text-sm">Xabarnomalar</h3>
           <div className="flex items-center gap-1">
@@ -175,7 +183,7 @@ export function NotificationBell() {
             ))
           )}
         </ScrollArea>
-      </PopoverContent>
-    </Popover>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
