@@ -187,7 +187,7 @@ export default function AdminNotifications() {
         targetType,
         targetName,
         sentAt: new Date().toISOString(),
-        recipientCount: result.data?.recipientCount || 1,
+        recipientCount: result?.recipientCount || 1,
       }, ...prev].slice(0, 10));
 
       // Reset form

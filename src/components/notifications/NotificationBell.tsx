@@ -15,14 +15,13 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
 const notificationTypeColors: Record<string, string> = {
-  lesson_completed: 'bg-green-500',
-  unit_completed: 'bg-blue-500',
-  achievement_unlocked: 'bg-yellow-500',
-  payment_reminder: 'bg-orange-500',
-  payment_approved: 'bg-emerald-500',
-  group_joined: 'bg-purple-500',
-  new_lesson_available: 'bg-cyan-500',
-  quiz_passed: 'bg-indigo-500',
+  lesson_complete: 'bg-green-500',
+  unit_complete: 'bg-blue-500',
+  achievement: 'bg-yellow-500',
+  payment: 'bg-emerald-500',
+  group: 'bg-purple-500',
+  new_lesson: 'bg-cyan-500',
+  quiz: 'bg-indigo-500',
   system: 'bg-gray-500',
 };
 

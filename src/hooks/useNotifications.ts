@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface Notification {
   id: string;
@@ -13,23 +14,26 @@ export interface Notification {
   createdAt: string;
 }
 
-interface NotificationsResponse {
-  success: boolean;
-  data?: {
-    notifications: Notification[];
-    unreadCount: number;
-  };
-  error?: string;
+interface DbNotification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string;
+  data: Record<string, unknown> | null;
+  read: boolean;
+  created_at: string;
 }
 
-const NOTIFICATIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notifications`;
-
-async function getAuthHeaders(): Promise<HeadersInit> {
-  const { data: { session } } = await supabase.auth.getSession();
-  
+function mapDbToNotification(db: DbNotification): Notification {
   return {
-    'Content-Type': 'application/json',
-    ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+    id: db.id,
+    type: db.type,
+    title: db.title,
+    message: db.message,
+    data: db.data || undefined,
+    read: db.read,
+    createdAt: db.created_at,
   };
 }
 
@@ -37,117 +41,116 @@ export function useNotifications(options: { enabled?: boolean; pollingInterval?:
   const { enabled = true, pollingInterval = 30000 } = options;
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
+  const { user } = useAuth();
+  const previousUnreadCountRef = useRef(0);
 
-  // Fetch notifications
+  // Fetch notifications from database
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['notifications'],
+    queryKey: ['notifications', user?.id],
     queryFn: async () => {
-      const headers = await getAuthHeaders();
-      
-      const response = await fetch(NOTIFICATIONS_URL, {
-        method: 'GET',
-        headers,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
-      }
-      
-      const result: NotificationsResponse = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Unknown error');
-      }
-      
-      return result.data;
+      if (!user?.id) return { notifications: [], unreadCount: 0 };
+
+      const { data: notifications, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      const mapped = (notifications as DbNotification[] || []).map(mapDbToNotification);
+      const unreadCount = mapped.filter(n => !n.read).length;
+
+      return { notifications: mapped, unreadCount };
     },
-    enabled,
+    enabled: enabled && !!user?.id,
     refetchInterval: pollingInterval,
     staleTime: 10000,
   });
 
-  // Show toast when new notifications arrive
+  // Realtime subscription for new notifications
   useEffect(() => {
-    if (data?.unreadCount && data.unreadCount > previousUnreadCount && previousUnreadCount > 0) {
-      const newNotifications = data.notifications
-        .filter(n => !n.read)
-        .slice(0, data.unreadCount - previousUnreadCount);
-      
-      newNotifications.forEach(n => {
-        toast({
-          title: n.title,
-          description: n.message,
-        });
-      });
-    }
-    
-    if (data?.unreadCount !== undefined) {
-      setPreviousUnreadCount(data.unreadCount);
-    }
-  }, [data?.unreadCount, previousUnreadCount, data?.notifications, toast]);
+    if (!user?.id || !enabled) return;
+
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newNotification = mapDbToNotification(payload.new as DbNotification);
+          
+          // Show toast for new notification
+          toast({
+            title: newNotification.title,
+            description: newNotification.message,
+          });
+
+          // Invalidate query to refetch
+          queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, enabled, queryClient, toast]);
 
   // Mark as read mutation
   const markAsRead = useMutation({
     mutationFn: async (notificationId: string) => {
-      const headers = await getAuthHeaders();
-      
-      const response = await fetch(`${NOTIFICATIONS_URL}/read`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ notification_id: notificationId }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to mark as read');
-      }
-      
-      return response.json();
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
     },
   });
 
   // Mark all as read mutation
   const markAllAsRead = useMutation({
     mutationFn: async () => {
-      const headers = await getAuthHeaders();
-      
-      const response = await fetch(`${NOTIFICATIONS_URL}/read-all`, {
-        method: 'POST',
-        headers,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to mark all as read');
-      }
-      
-      return response.json();
+      if (!user?.id) return;
+
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
     },
   });
 
   // Clear all notifications mutation
   const clearAll = useMutation({
     mutationFn: async () => {
-      const headers = await getAuthHeaders();
-      
-      const response = await fetch(`${NOTIFICATIONS_URL}/clear`, {
-        method: 'DELETE',
-        headers,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to clear notifications');
-      }
-      
-      return response.json();
+      if (!user?.id) return;
+
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
     },
   });
 
@@ -180,33 +183,51 @@ export function useSendNotification() {
       message: string;
       data?: Record<string, unknown>;
     }) => {
-      const headers = await getAuthHeaders();
-      
-      const response = await fetch(`${NOTIFICATIONS_URL}/send`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          target_user_id: params.targetUserId,
-          target_group_id: params.targetGroupId,
-          type: params.type,
-          title: params.title,
-          message: params.message,
-          data: params.data,
-        }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to send notification');
+      let recipientIds: string[] = [];
+
+      // If targeting a specific user
+      if (params.targetUserId) {
+        recipientIds = [params.targetUserId];
       }
-      
-      return response.json();
+      // If targeting a group
+      else if (params.targetGroupId) {
+        const { data: members, error } = await supabase
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', params.targetGroupId)
+          .eq('is_approved', true);
+
+        if (error) throw error;
+        recipientIds = members?.map(m => m.user_id) || [];
+      }
+
+      if (recipientIds.length === 0) {
+        throw new Error('No recipients found');
+      }
+
+      // Insert notifications for all recipients
+      const notifications = recipientIds.map(userId => ({
+        user_id: userId,
+        type: params.type,
+        title: params.title,
+        message: params.message,
+        data: params.data ? JSON.parse(JSON.stringify(params.data)) : null,
+      }));
+
+      const { error } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      if (error) throw error;
+
+      return { recipientCount: recipientIds.length };
     },
     onSuccess: (data) => {
       toast({
         title: 'Xabar yuborildi',
-        description: `${data.data?.recipientCount || 0} ta foydalanuvchiga yuborildi`,
+        description: `${data?.recipientCount || 0} ta foydalanuvchiga yuborildi`,
       });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
     onError: (error) => {
       toast({
@@ -220,24 +241,23 @@ export function useSendNotification() {
 
 // Unread count only (lighter query)
 export function useUnreadCount(enabled = true) {
+  const { user } = useAuth();
+
   return useQuery({
-    queryKey: ['notifications', 'unread-count'],
+    queryKey: ['notifications', 'unread-count', user?.id],
     queryFn: async () => {
-      const headers = await getAuthHeaders();
-      
-      const response = await fetch(`${NOTIFICATIONS_URL}/unread-count`, {
-        method: 'GET',
-        headers,
-      });
-      
-      if (!response.ok) {
-        return { unreadCount: 0 };
-      }
-      
-      const result = await response.json();
-      return { unreadCount: result.data?.unreadCount || 0 };
+      if (!user?.id) return { unreadCount: 0 };
+
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
+
+      if (error) return { unreadCount: 0 };
+      return { unreadCount: count || 0 };
     },
-    enabled,
+    enabled: enabled && !!user?.id,
     refetchInterval: 15000,
     staleTime: 5000,
   });
