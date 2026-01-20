@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Lock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,7 +11,7 @@ interface SectionCardProps {
   isLocked?: boolean;
 }
 
-export function SectionCard({ section, onClick, isLocked = false }: SectionCardProps) {
+export const SectionCard = memo(function SectionCard({ section, onClick, isLocked = false }: SectionCardProps) {
   const Icon = section.icon;
 
   return (
@@ -94,4 +95,4 @@ export function SectionCard({ section, onClick, isLocked = false }: SectionCardP
       </Card>
     </motion.div>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, CheckCircle2, Play, BookOpen, Trophy, Target } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +25,7 @@ interface UnitCardProps {
   onClick: () => void;
 }
 
-export function UnitCard({ unit, index, onClick }: UnitCardProps) {
+export const UnitCard = memo(function UnitCard({ unit, index, onClick }: UnitCardProps) {
   const hasDetailedProgress = unit.totalLessons !== undefined && unit.totalLessons > 0;
   const scoreColor = unit.averageScore !== undefined 
     ? unit.averageScore >= 80 
@@ -149,4 +150,4 @@ export function UnitCard({ unit, index, onClick }: UnitCardProps) {
       </Card>
     </motion.div>
   );
-}
+});
