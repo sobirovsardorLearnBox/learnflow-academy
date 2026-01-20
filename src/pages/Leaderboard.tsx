@@ -8,7 +8,8 @@ import {
   BookOpen, 
   Folder,
   Users,
-  Clock
+  Clock,
+  Zap
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { uz } from 'date-fns/locale';
@@ -120,6 +121,13 @@ function LeaderboardCard({ entry, rank, isCurrentUser }: LeaderboardCardProps) {
             {/* Stats */}
             <div className="flex items-center gap-4 shrink-0">
               <div className="text-center">
+                <div className="flex items-center gap-1 text-yellow-500">
+                  <Zap className="w-4 h-4" />
+                  <span className="font-bold text-lg">{entry.total_score || 0}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Ball</p>
+              </div>
+              <div className="text-center">
                 <div className="flex items-center gap-1 text-primary">
                   <BookOpen className="w-4 h-4" />
                   <span className="font-bold text-lg">{entry.completed_lessons}</span>
@@ -173,7 +181,7 @@ function TopThreePodium({ entries, currentUserId }: { entries: LeaderboardEntry[
               </AvatarFallback>
             </Avatar>
             <p className="font-medium text-sm text-center mb-1 max-w-[80px] truncate">{entry.name}</p>
-            <p className="text-xs text-muted-foreground mb-2">{entry.completed_lessons} dars</p>
+            <p className="text-xs text-muted-foreground mb-2">{entry.total_score || 0} ball</p>
             <div className={cn(
               'w-20 rounded-t-lg flex items-center justify-center',
               height,
@@ -224,7 +232,7 @@ export default function Leaderboard() {
               Reyting
             </motion.h1>
             <p className="text-muted-foreground mt-1">
-              Eng ko'p dars tugatgan talabalar ro'yxati
+              Eng ko'p ball to'plagan talabalar ro'yxati
             </p>
           </div>
 
@@ -266,9 +274,9 @@ export default function Leaderboard() {
                     <p className="text-2xl font-bold">#{userRankDisplay}</p>
                   </div>
                   <div className="ml-auto text-right">
-                    <p className="text-sm text-muted-foreground">Tugatilgan darslar</p>
-                    <p className="text-2xl font-bold text-primary">
-                      {currentLeaderboard?.[currentUserRank!]?.completed_lessons || 0}
+                    <p className="text-sm text-muted-foreground">Jami ball</p>
+                    <p className="text-2xl font-bold text-yellow-500">
+                      {currentLeaderboard?.[currentUserRank!]?.total_score || 0}
                     </p>
                   </div>
                 </div>

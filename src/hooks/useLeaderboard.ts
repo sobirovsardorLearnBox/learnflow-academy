@@ -7,6 +7,7 @@ export interface LeaderboardEntry {
   avatar_url: string | null;
   completed_lessons: number;
   completed_units: number;
+  total_score: number;
   last_activity: string | null;
 }
 
