@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths, format, eachDayOfInterval, eachWeekOfInterval } from 'date-fns';
+import { QUERY_STALE_TIMES, QUERY_GC_TIMES } from '@/lib/query-config';
 
 export interface DailyProgress {
   date: string;
@@ -42,23 +43,23 @@ export const useDailyProgress = (userId?: string, days: number = 7) => {
       startDate.setDate(startDate.getDate() - days + 1);
       startDate.setHours(0, 0, 0, 0);
 
-      // Get lesson progress
-      const { data: lessonProgress } = await supabase
-        .from('lesson_progress')
-        .select('completed_at')
-        .eq('user_id', userId)
-        .eq('completed', true)
-        .gte('completed_at', startDate.toISOString())
-        .lte('completed_at', endDate.toISOString());
-
-      // Get unit progress
-      const { data: unitProgress } = await supabase
-        .from('user_progress')
-        .select('completed_at')
-        .eq('user_id', userId)
-        .eq('completed', true)
-        .gte('completed_at', startDate.toISOString())
-        .lte('completed_at', endDate.toISOString());
+      // Use parallel queries for efficiency
+      const [lessonProgress, unitProgress] = await Promise.all([
+        supabase
+          .from('lesson_progress')
+          .select('completed_at')
+          .eq('user_id', userId)
+          .eq('completed', true)
+          .gte('completed_at', startDate.toISOString())
+          .lte('completed_at', endDate.toISOString()),
+        supabase
+          .from('user_progress')
+          .select('completed_at')
+          .eq('user_id', userId)
+          .eq('completed', true)
+          .gte('completed_at', startDate.toISOString())
+          .lte('completed_at', endDate.toISOString()),
+      ]);
 
       // Create daily buckets
       const dailyData: DailyProgress[] = eachDayOfInterval({ start: startDate, end: endDate }).map(date => ({
@@ -68,7 +69,7 @@ export const useDailyProgress = (userId?: string, days: number = 7) => {
       }));
 
       // Count lessons per day
-      lessonProgress?.forEach(p => {
+      lessonProgress.data?.forEach(p => {
         if (p.completed_at) {
           const day = format(new Date(p.completed_at), 'yyyy-MM-dd');
           const dayData = dailyData.find(d => d.date === day);
@@ -77,7 +78,7 @@ export const useDailyProgress = (userId?: string, days: number = 7) => {
       });
 
       // Count units per day
-      unitProgress?.forEach(p => {
+      unitProgress.data?.forEach(p => {
         if (p.completed_at) {
           const day = format(new Date(p.completed_at), 'yyyy-MM-dd');
           const dayData = dailyData.find(d => d.date === day);
@@ -88,6 +89,8 @@ export const useDailyProgress = (userId?: string, days: number = 7) => {
       return dailyData;
     },
     enabled: !!userId,
+    staleTime: QUERY_STALE_TIMES.userProgress,
+    gcTime: QUERY_GC_TIMES.userSpecific,
   });
 };
 

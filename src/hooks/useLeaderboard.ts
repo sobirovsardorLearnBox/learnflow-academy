@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { QUERY_STALE_TIMES, QUERY_GC_TIMES, queryKeys } from '@/lib/query-config';
 
 export interface LeaderboardEntry {
   user_id: string;
@@ -11,10 +12,10 @@ export interface LeaderboardEntry {
   last_activity: string | null;
 }
 
-// Get global student leaderboard
+// Get global student leaderboard - prefer useOptimizedLeaderboard for production
 export const useLeaderboard = (limit: number = 50) => {
   return useQuery({
-    queryKey: ['leaderboard', limit],
+    queryKey: queryKeys.leaderboard(undefined, limit),
     queryFn: async () => {
       const { data, error } = await supabase
         .rpc('get_student_leaderboard', { limit_count: limit });
@@ -22,13 +23,16 @@ export const useLeaderboard = (limit: number = 50) => {
       if (error) throw error;
       return (data || []) as LeaderboardEntry[];
     },
+    staleTime: QUERY_STALE_TIMES.leaderboard,
+    gcTime: QUERY_GC_TIMES.realtime,
+    refetchOnWindowFocus: false,
   });
 };
 
-// Get group-specific leaderboard
+// Get group-specific leaderboard - prefer useOptimizedLeaderboard for production
 export const useGroupLeaderboard = (groupId?: string) => {
   return useQuery({
-    queryKey: ['group_leaderboard', groupId],
+    queryKey: queryKeys.groupLeaderboard(groupId),
     queryFn: async () => {
       if (!groupId) return [];
       
@@ -39,13 +43,16 @@ export const useGroupLeaderboard = (groupId?: string) => {
       return (data || []) as LeaderboardEntry[];
     },
     enabled: !!groupId,
+    staleTime: QUERY_STALE_TIMES.leaderboard,
+    gcTime: QUERY_GC_TIMES.realtime,
+    refetchOnWindowFocus: false,
   });
 };
 
 // Get user's groups for filtering
 export const useUserGroups = (userId?: string) => {
   return useQuery({
-    queryKey: ['user_groups', userId],
+    queryKey: queryKeys.userGroups(userId),
     queryFn: async () => {
       if (!userId) return [];
 
@@ -68,5 +75,7 @@ export const useUserGroups = (userId?: string) => {
       })).filter(g => g.id) || [];
     },
     enabled: !!userId,
+    staleTime: QUERY_STALE_TIMES.userProgress,
+    gcTime: QUERY_GC_TIMES.userSpecific,
   });
 };

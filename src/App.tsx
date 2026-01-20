@@ -31,7 +31,31 @@ import AdminStatistics from "./pages/admin/AdminStatistics";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Optimized QueryClient with global defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Default stale time - data stays fresh for 30 seconds
+      staleTime: 30 * 1000,
+      // Default garbage collection time - 5 minutes
+      gcTime: 5 * 60 * 1000,
+      // Retry failed requests up to 2 times
+      retry: 2,
+      // Don't refetch on window focus by default (reduces unnecessary API calls)
+      refetchOnWindowFocus: false,
+      // Don't refetch on reconnect by default
+      refetchOnReconnect: true,
+      // Network mode - always fetch even if offline (for PWA support)
+      networkMode: 'offlineFirst',
+    },
+    mutations: {
+      // Retry mutations once
+      retry: 1,
+      // Network mode for mutations
+      networkMode: 'offlineFirst',
+    },
+  },
+});
 
 function LoadingScreen() {
   return (
