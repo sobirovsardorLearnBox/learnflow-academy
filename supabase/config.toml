@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.api-gateway]
 verify_jwt = false
+
+[functions.notifications]
+verify_jwt = false
