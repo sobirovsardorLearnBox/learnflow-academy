@@ -230,6 +230,11 @@ export default function Lesson() {
     toast.success(`Test yakunlandi! Jami ball: ${totalScore}/100`);
   };
 
+  const handleQuizRetry = () => {
+    // Reset quiz score to allow retry
+    setQuizScore(null);
+  };
+
   const handleMarkUnitComplete = async () => {
     if (!unitId || !user?.user_id) return;
     try {
@@ -497,6 +502,8 @@ export default function Lesson() {
                     <QuizComponent
                       questions={quizQuestions}
                       onComplete={handleQuizComplete}
+                      onRetry={handleQuizRetry}
+                      minPassPercentage={80}
                     />
                   ) : (
                     <Card variant="glass">

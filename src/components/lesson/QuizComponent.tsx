@@ -18,9 +18,11 @@ interface QuizQuestion {
 interface QuizComponentProps {
   questions: QuizQuestion[];
   onComplete?: (score: number, total: number, percentage: number) => void;
+  onRetry?: () => void;
+  minPassPercentage?: number;
 }
 
-export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
+export function QuizComponent({ questions, onComplete, onRetry, minPassPercentage = 80 }: QuizComponentProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -103,6 +105,7 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
     setLastAnswerCorrect(false);
     setRevealedCorrectAnswer(null);
     setRevealedExplanation(null);
+    onRetry?.();
   };
 
   if (isCompleted) {
@@ -110,7 +113,11 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
     const quizPercentage = Math.round((finalScore / questions.length) * 100);
     // Quiz contributes 80% of total score
     const quizPoints = Math.round((quizPercentage / 100) * 80);
-    const isPassed = quizPercentage >= 70;
+    // Video is 20 points, so total minimum for 80% is video(20) + quiz(64) = 84
+    // Quiz needs at least 64/80 = 80% to pass with video
+    const totalScoreWithVideo = 20 + quizPoints;
+    const isPassed = totalScoreWithVideo >= minPassPercentage;
+    const needsRetry = !isPassed;
 
     return (
       <motion.div
@@ -135,25 +142,52 @@ export function QuizComponent({ questions, onComplete }: QuizComponentProps) {
               )}
             </motion.div>
             <CardTitle className="text-2xl">
-              {isPassed ? "Tabriklaymiz!" : "Yana urinib ko'ring!"}
+              {isPassed ? "Tabriklaymiz!" : "Keyingi dars uchun 80% kerak!"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
-              <p className="text-4xl font-bold text-primary">{quizPoints}/80</p>
+              <p className="text-4xl font-bold text-primary">{totalScoreWithVideo}/100</p>
               <p className="text-muted-foreground">
                 {finalScore} ta to'g'ri javob ({questions.length} tadan)
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Test uchun: {quizPoints} ball (80% dan)
+                Video: 20 ball + Test: {quizPoints} ball
               </p>
             </div>
+
+            {/* Warning message for low score */}
+            {needsRetry && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30"
+              >
+                <p className="text-amber-600 dark:text-amber-400 font-medium">
+                  ⚠️ Keyingi darsga o'tish uchun kamida 80% ball kerak
+                </p>
+                <p className="text-sm text-amber-600/80 dark:text-amber-400/80 mt-1">
+                  Hozirgi: {totalScoreWithVideo}% | Kerak: 80%
+                </p>
+              </motion.div>
+            )}
+
             <div className="flex gap-3 justify-center">
-              <Button variant="outline" onClick={handleRetry}>
+              <Button 
+                variant={needsRetry ? "default" : "outline"} 
+                onClick={handleRetry}
+                className={needsRetry ? "animate-pulse" : ""}
+              >
                 <RotateCcw className="w-4 h-4 mr-2" />
-                Qayta urinish
+                {needsRetry ? "Qayta test ishlash" : "Qayta urinish"}
               </Button>
             </div>
+
+            {needsRetry && (
+              <p className="text-xs text-muted-foreground">
+                Testni qayta ishlab, yuqori ball olishingiz mumkin
+              </p>
+            )}
           </CardContent>
         </Card>
       </motion.div>
