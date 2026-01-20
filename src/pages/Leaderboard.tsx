@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeaderboard, useGroupLeaderboard, useUserGroups } from '@/hooks/useLeaderboard';
 import { LeaderboardCard } from '@/components/leaderboard/LeaderboardCard';
 import { TopThreePodium } from '@/components/leaderboard/TopThreePodium';
+import { VirtualizedLeaderboardList } from '@/components/leaderboard/VirtualizedLeaderboardList';
 
 export default function Leaderboard() {
   const { user } = useAuth();
@@ -145,15 +146,25 @@ export default function Leaderboard() {
                   {currentLeaderboard.length} ta faol talaba
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {currentLeaderboard.map((entry, index) => (
-                  <LeaderboardCard
-                    key={entry.user_id}
-                    entry={entry}
-                    rank={index + 1}
-                    isCurrentUser={entry.user_id === user.id}
+              <CardContent>
+                {currentLeaderboard.length > 20 ? (
+                  <VirtualizedLeaderboardList
+                    entries={currentLeaderboard}
+                    currentUserId={user.id}
+                    maxHeight={600}
                   />
-                ))}
+                ) : (
+                  <div className="space-y-3">
+                    {currentLeaderboard.map((entry, index) => (
+                      <LeaderboardCard
+                        key={entry.user_id}
+                        entry={entry}
+                        rank={index + 1}
+                        isCurrentUser={entry.user_id === user.id}
+                      />
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
