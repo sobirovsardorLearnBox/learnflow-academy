@@ -33,6 +33,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Plus, Users, Trash2, UserPlus, Loader2, BarChart3, Download, Pencil, Search, Clock, UserCheck, UserRoundPlus, BookOpen, Check } from 'lucide-react';
+import { DailyLimitDialog } from '@/components/admin/DailyLimitDialog';
 import { Switch } from '@/components/ui/switch';
 import { StudentProgressDialog } from '@/components/teacher/StudentProgressDialog';
 import { GroupProgressStats } from '@/components/teacher/GroupProgressStats';
@@ -59,6 +60,7 @@ interface Student {
   name: string;
   email: string;
   is_approved?: boolean;
+  daily_lesson_limit?: number;
 }
 
 export default function TeacherGroups() {
@@ -74,6 +76,8 @@ export default function TeacherGroups() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [limitDialogStudent, setLimitDialogStudent] = useState<Student | null>(null);
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
   const [editGroup, setEditGroup] = useState({ name: '', description: '' });
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -157,7 +161,7 @@ export default function TeacherGroups() {
         (data || []).map(async (member) => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('name, email')
+            .select('name, email, daily_lesson_limit')
             .eq('user_id', member.user_id)
             .single();
 
@@ -176,11 +180,12 @@ export default function TeacherGroups() {
             email: profile?.email || '',
             progress,
             is_approved: member.is_approved,
+            daily_lesson_limit: profile?.daily_lesson_limit ?? 1,
           };
         })
       );
 
-      return membersWithProfiles as (Student & { progress: number; is_approved: boolean })[];
+      return membersWithProfiles as (Student & { progress: number; is_approved: boolean; daily_lesson_limit: number })[];
     },
     enabled: !!selectedGroup?.id,
   });
@@ -646,6 +651,7 @@ export default function TeacherGroups() {
                         <TableHead>Email</TableHead>
                         <TableHead className="w-24 text-center">Holat</TableHead>
                         <TableHead className="w-24 text-center">Progress</TableHead>
+                        <TableHead className="w-20 text-center">Limit</TableHead>
                         <TableHead className="w-32 text-center">Amallar</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -675,6 +681,25 @@ export default function TeacherGroups() {
                               >
                                 {member.progress}%
                               </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {member.is_approved ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => {
+                                  setLimitDialogStudent(member);
+                                  setLimitDialogOpen(true);
+                                }}
+                                title="Kunlik limitni o'zgartirish"
+                              >
+                                <Clock className="w-3 h-3 mr-1" />
+                                {member.daily_lesson_limit}/kun
+                              </Button>
                             ) : (
                               <span className="text-muted-foreground text-sm">-</span>
                             )}
@@ -990,6 +1015,13 @@ export default function TeacherGroups() {
             groupName={selectedGroup.name}
           />
         )}
+
+        {/* Daily Limit Dialog */}
+        <DailyLimitDialog
+          open={limitDialogOpen}
+          onOpenChange={setLimitDialogOpen}
+          user={limitDialogStudent}
+        />
       </div>
     </DashboardLayout>
   );

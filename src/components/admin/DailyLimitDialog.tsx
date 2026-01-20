@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Clock } from 'lucide-react';
 import {
   Dialog,
@@ -29,23 +29,25 @@ export function DailyLimitDialog({ open, onOpenChange, user }: DailyLimitDialogP
   const queryClient = useQueryClient();
 
   // Update limit when user changes
-  useState(() => {
+  useEffect(() => {
     if (user) {
       setLimit(user.daily_lesson_limit ?? 1);
     }
-  });
+  }, [user]);
 
   const updateLimit = useMutation({
     mutationFn: async ({ userId, newLimit }: { userId: string; newLimit: number }) => {
       const { error } = await supabase
         .from('profiles')
-        .update({ daily_lesson_limit: newLimit } as any)
+        .update({ daily_lesson_limit: newLimit })
         .eq('user_id', userId);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['teacher-students'] });
+      queryClient.invalidateQueries({ queryKey: ['group-members'] });
       toast.success('Kunlik limit muvaffaqiyatli yangilandi');
       onOpenChange(false);
     },
