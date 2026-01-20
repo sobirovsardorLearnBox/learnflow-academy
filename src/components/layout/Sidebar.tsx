@@ -37,6 +37,7 @@ const navItems = {
     { icon: GraduationCap, label: 'Darslar', path: '/lessons' },
     { icon: CalendarCheck, label: 'Davomat', path: '/attendance' },
     { icon: BarChart3, label: 'Statistika', path: '/teacher/statistics' },
+    { icon: Bell, label: 'Xabarnomalar', path: '/teacher/notifications' },
     { icon: User, label: 'Profil', path: '/profile' },
   ],
   admin: [
