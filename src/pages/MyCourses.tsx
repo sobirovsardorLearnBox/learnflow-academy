@@ -453,6 +453,10 @@ export default function MyCourses() {
         unlockProgressNeeded,
         subUnits: progress ? [`${progress.completed}/${progress.total} dars`] : ['Darslar yo\'q'],
         progress: progressPercent,
+        totalLessons: progress?.total || 0,
+        completedLessons: progress?.completed || 0,
+        averageScore: progress?.averageScore || 0,
+        passedCount: progress?.passedCount || 0,
       };
     });
   }, [units, unitProgress, accessibleUnitIds]);

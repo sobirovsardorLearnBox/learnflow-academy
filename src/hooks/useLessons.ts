@@ -112,25 +112,40 @@ export const useUnitProgress = (unitIds: string[], userId?: string) => {
       
       if (!lessons) return {};
       
-      // Get completed lessons for this user
+      // Get completed lessons with scores for this user
       const { data: progress } = await supabase
         .from('lesson_progress')
-        .select('lesson_id')
-        .eq('user_id', userId)
-        .eq('completed', true);
+        .select('lesson_id, score, completed')
+        .eq('user_id', userId);
       
-      const completedLessonIds = new Set(progress?.map(p => p.lesson_id) || []);
+      const progressMap = new Map(progress?.map(p => [p.lesson_id, p]) || []);
       
-      // Calculate progress per unit
-      const unitProgress: Record<string, { completed: number; total: number }> = {};
+      // Calculate progress per unit with average score
+      const unitProgress: Record<string, { completed: number; total: number; averageScore: number; passedCount: number }> = {};
       
       for (const lesson of lessons) {
         if (!unitProgress[lesson.unit_id]) {
-          unitProgress[lesson.unit_id] = { completed: 0, total: 0 };
+          unitProgress[lesson.unit_id] = { completed: 0, total: 0, averageScore: 0, passedCount: 0 };
         }
         unitProgress[lesson.unit_id].total++;
-        if (completedLessonIds.has(lesson.id)) {
+        
+        const lessonProgress = progressMap.get(lesson.id);
+        if (lessonProgress?.completed) {
           unitProgress[lesson.unit_id].completed++;
+          if (lessonProgress.score !== null && lessonProgress.score !== undefined) {
+            unitProgress[lesson.unit_id].averageScore += lessonProgress.score;
+            if (lessonProgress.score >= 80) {
+              unitProgress[lesson.unit_id].passedCount++;
+            }
+          }
+        }
+      }
+      
+      // Calculate average scores
+      for (const unitId of Object.keys(unitProgress)) {
+        const unit = unitProgress[unitId];
+        if (unit.completed > 0) {
+          unit.averageScore = Math.round(unit.averageScore / unit.completed);
         }
       }
       
