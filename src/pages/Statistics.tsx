@@ -8,7 +8,8 @@ import {
   Target, 
   Calendar,
   BarChart3,
-  LineChart as LineChartIcon
+  LineChart as LineChartIcon,
+  Award
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -21,6 +22,7 @@ import {
   useMonthlyProgress, 
   useProgressSummary 
 } from '@/hooks/useProgressStats';
+import { useAverageScore, useLessonScores } from '@/hooks/useLessons';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -36,6 +38,7 @@ import {
   AreaChart
 } from 'recharts';
 import { Loader2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 export default function Statistics() {
   const { user } = useAuth();
@@ -45,12 +48,21 @@ export default function Statistics() {
   const { data: weeklyProgress, isLoading: weeklyLoading } = useWeeklyProgress(user?.user_id, 8);
   const { data: monthlyProgress, isLoading: monthlyLoading } = useMonthlyProgress(user?.user_id, 6);
   const { data: summary, isLoading: summaryLoading } = useProgressSummary(user?.user_id);
+  const { data: scoreData, isLoading: scoreLoading } = useAverageScore(user?.user_id);
+  const { data: lessonScores, isLoading: lessonScoresLoading } = useLessonScores(user?.user_id);
 
   if (!user) return null;
 
-  const isLoading = dailyLoading || weeklyLoading || monthlyLoading || summaryLoading;
+  const isLoading = dailyLoading || weeklyLoading || monthlyLoading || summaryLoading || scoreLoading;
 
   const stats = [
+    { 
+      label: "O'rtacha ball", 
+      value: `${scoreData?.averageScore || 0}/100`, 
+      icon: Award, 
+      color: 'from-yellow-500 to-orange-600',
+      description: 'Darslar bo\'yicha'
+    },
     { 
       label: "Jami darslar", 
       value: summary?.totalLessons || 0, 
@@ -66,10 +78,17 @@ export default function Statistics() {
       description: 'Tugatilgan unitlar'
     },
     { 
+      label: "Jami ball", 
+      value: scoreData?.totalScore || 0, 
+      icon: Target, 
+      color: 'from-emerald-500 to-teal-600',
+      description: 'Barcha darslardan'
+    },
+    { 
       label: "Bu hafta", 
       value: summary?.thisWeekLessons || 0, 
       icon: Calendar, 
-      color: 'from-emerald-500 to-teal-600',
+      color: 'from-pink-500 to-rose-600',
       description: 'Darslar tugatildi'
     },
     { 
@@ -78,20 +97,6 @@ export default function Statistics() {
       icon: Flame, 
       color: 'from-orange-500 to-red-600',
       description: 'Ketma-ket kunlar'
-    },
-    { 
-      label: "Bu oy", 
-      value: summary?.thisMonthLessons || 0, 
-      icon: Target, 
-      color: 'from-pink-500 to-rose-600',
-      description: 'Darslar tugatildi'
-    },
-    { 
-      label: "O'rtacha", 
-      value: summary?.averageDailyLessons || 0, 
-      icon: TrendingUp, 
-      color: 'from-amber-500 to-yellow-600',
-      description: 'Kunlik darslar'
     },
   ];
 
@@ -355,6 +360,76 @@ export default function Statistics() {
                         </div>
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover border rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                           {format(new Date(day.date), 'MMM d')} - {day.lessons} dars
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Recent Lesson Scores */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="w-5 h-5" />
+                So'nggi dars natijalari
+              </CardTitle>
+              <CardDescription>Video va test ballarini ko'ring</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {lessonScoresLoading ? (
+                <div className="flex items-center justify-center h-20">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : !lessonScores || lessonScores.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Hali tugatilgan darslar mavjud emas
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {lessonScores.slice(0, 10).map((item: any, index: number) => {
+                    const videoScore = item.video_completed ? 20 : 0;
+                    const quizScore = Math.round((item.quiz_score || 0) / 100 * 80);
+                    const totalScore = item.score || (videoScore + quizScore);
+                    
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {item.lessons?.title || 'Dars'}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {item.lessons?.units?.name || 'Unit'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>Video: {videoScore}/20</span>
+                              <span>•</span>
+                              <span>Test: {quizScore}/80</span>
+                            </div>
+                          </div>
+                          <div className="w-16">
+                            <Progress value={totalScore} className="h-2" />
+                            <p className="text-xs text-center mt-1 font-medium">
+                              {totalScore}/100
+                            </p>
+                          </div>
                         </div>
                       </motion.div>
                     );

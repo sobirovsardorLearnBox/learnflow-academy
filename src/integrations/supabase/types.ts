@@ -233,8 +233,11 @@ export type Database = {
           created_at: string
           id: string
           lesson_id: string
+          quiz_score: number | null
+          score: number | null
           updated_at: string
           user_id: string
+          video_completed: boolean | null
         }
         Insert: {
           completed?: boolean
@@ -242,8 +245,11 @@ export type Database = {
           created_at?: string
           id?: string
           lesson_id: string
+          quiz_score?: number | null
+          score?: number | null
           updated_at?: string
           user_id: string
+          video_completed?: boolean | null
         }
         Update: {
           completed?: boolean
@@ -251,8 +257,11 @@ export type Database = {
           created_at?: string
           id?: string
           lesson_id?: string
+          quiz_score?: number | null
+          score?: number | null
           updated_at?: string
           user_id?: string
+          video_completed?: boolean | null
         }
         Relationships: [
           {
