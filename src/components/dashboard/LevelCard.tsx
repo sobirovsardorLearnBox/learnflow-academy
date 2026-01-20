@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, CheckCircle2, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,7 +11,7 @@ interface LevelCardProps {
   onClick: () => void;
 }
 
-export function LevelCard({ level, index, onClick }: LevelCardProps) {
+export const LevelCard = memo(function LevelCard({ level, index, onClick }: LevelCardProps) {
   const isCompleted = level.progress === 100;
 
   return (
@@ -88,4 +89,4 @@ export function LevelCard({ level, index, onClick }: LevelCardProps) {
       </Card>
     </motion.div>
   );
-}
+});
