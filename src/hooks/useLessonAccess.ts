@@ -23,12 +23,12 @@ export function useLessonAccess(lessonId?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['lesson_access', lessonId, user?.id],
+    queryKey: ['lesson_access', lessonId, user?.user_id],
     queryFn: async () => {
-      if (!lessonId || !user?.id) return null;
+      if (!lessonId || !user?.user_id) return null;
 
       const { data, error } = await supabase.rpc('check_lesson_access', {
-        p_user_id: user.id,
+        p_user_id: user.user_id,
         p_lesson_id: lessonId,
       });
 
@@ -39,7 +39,7 @@ export function useLessonAccess(lessonId?: string) {
 
       return data as unknown as LessonAccessResult;
     },
-    enabled: !!lessonId && !!user?.id,
+    enabled: !!lessonId && !!user?.user_id,
     staleTime: 30000, // 30 seconds
   });
 }
@@ -48,12 +48,12 @@ export function useDailyLessonLimit() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['daily_lesson_limit', user?.id],
+    queryKey: ['daily_lesson_limit', user?.user_id],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user?.user_id) return null;
 
       const { data, error } = await supabase.rpc('can_complete_lesson_today', {
-        p_user_id: user.id,
+        p_user_id: user.user_id,
       });
 
       if (error) {
@@ -63,7 +63,7 @@ export function useDailyLessonLimit() {
 
       return data as unknown as DailyLimitResult;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.user_id,
     staleTime: 60000, // 1 minute
     refetchOnWindowFocus: true,
   });
