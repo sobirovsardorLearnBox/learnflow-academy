@@ -25,6 +25,7 @@ import TeacherGroups from "./pages/teacher/TeacherGroups";
 import TeacherLessons from "./pages/teacher/TeacherLessons";
 import TeacherAttendance from "./pages/teacher/TeacherAttendance";
 import TeacherStatistics from "./pages/teacher/TeacherStatistics";
+import TeacherNotifications from "./pages/teacher/TeacherNotifications";
 import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminStatistics from "./pages/admin/AdminStatistics";
 import AdminNotifications from "./pages/admin/AdminNotifications";
@@ -187,6 +188,12 @@ function AppRoutes() {
       <Route path="/teacher/statistics" element={
         <ProtectedRoute allowedRoles={['teacher']}>
           <TeacherStatistics />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/teacher/notifications" element={
+        <ProtectedRoute allowedRoles={['teacher']}>
+          <TeacherNotifications />
         </ProtectedRoute>
       } />
 
