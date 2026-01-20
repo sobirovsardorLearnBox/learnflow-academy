@@ -304,12 +304,85 @@ export const useMarkLessonComplete = () => {
           });
         if (error) throw error;
       }
+
+      // Check if all lessons in the unit are completed with 80%+
+      // Get the unit_id for this lesson
+      const { data: lesson } = await supabase
+        .from('lessons')
+        .select('unit_id')
+        .eq('id', lessonId)
+        .single();
+
+      if (lesson?.unit_id) {
+        // Get all active lessons in this unit
+        const { data: unitLessons } = await supabase
+          .from('lessons')
+          .select('id')
+          .eq('unit_id', lesson.unit_id)
+          .eq('is_active', true);
+
+        if (unitLessons && unitLessons.length > 0) {
+          // Get all completed lessons for this user in this unit
+          const lessonIds = unitLessons.map(l => l.id);
+          const { data: completedProgress } = await supabase
+            .from('lesson_progress')
+            .select('lesson_id, score, video_completed')
+            .eq('user_id', userId)
+            .eq('completed', true)
+            .in('lesson_id', lessonIds);
+
+          // Check if all lessons are completed with 80%+ and video watched
+          const allLessonsPass = unitLessons.every(lesson => {
+            const progress = completedProgress?.find(p => p.lesson_id === lesson.id);
+            return progress && 
+                   (progress.score || 0) >= 80 && 
+                   progress.video_completed === true;
+          });
+
+          if (allLessonsPass) {
+            // Calculate average score for the unit
+            const avgScore = completedProgress 
+              ? Math.round(completedProgress.reduce((sum, p) => sum + (p.score || 0), 0) / completedProgress.length)
+              : 0;
+
+            // Mark unit as complete
+            const { data: existingUnitProgress } = await supabase
+              .from('user_progress')
+              .select('id')
+              .eq('unit_id', lesson.unit_id)
+              .eq('user_id', userId)
+              .maybeSingle();
+
+            if (existingUnitProgress) {
+              await supabase
+                .from('user_progress')
+                .update({ 
+                  completed: true, 
+                  completed_at: new Date().toISOString(),
+                  score: avgScore
+                })
+                .eq('id', existingUnitProgress.id);
+            } else {
+              await supabase
+                .from('user_progress')
+                .insert({ 
+                  unit_id: lesson.unit_id, 
+                  user_id: userId, 
+                  completed: true, 
+                  completed_at: new Date().toISOString(),
+                  score: avgScore
+                });
+            }
+          }
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lesson_progress'] });
       queryClient.invalidateQueries({ queryKey: ['user_stats'] });
       queryClient.invalidateQueries({ queryKey: ['unit_progress'] });
       queryClient.invalidateQueries({ queryKey: ['lesson_scores'] });
+      queryClient.invalidateQueries({ queryKey: ['user_progress'] });
     },
   });
 };
