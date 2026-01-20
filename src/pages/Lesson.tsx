@@ -172,12 +172,23 @@ export default function Lesson() {
     };
   }, [lessonId, markCurrentLessonCompleteWithScore, videoCompleted, quizScore]);
 
-  // Trigger confetti and achievement modal when all lessons are completed
+  // Count lessons that are completed with 80%+ score
+  const passedLessonsCount = useMemo(() => {
+    if (!lessons || !lessonScoresData) return 0;
+    const lessonIds = lessons.map(l => l.id);
+    return lessonScoresData.filter(p => 
+      lessonIds.includes(p.lesson_id) && 
+      p.video_completed === true &&
+      (p.score || 0) >= 80
+    ).length;
+  }, [lessons, lessonScoresData]);
+
+  // Trigger confetti and achievement modal when all lessons are completed with 80%+
   useEffect(() => {
     if (
       lessons && 
       lessons.length > 0 && 
-      completedLessons.length === lessons.length && 
+      passedLessonsCount === lessons.length && 
       !hasTriggeredConfetti.current
     ) {
       hasTriggeredConfetti.current = true;
@@ -185,10 +196,10 @@ export default function Lesson() {
       setAchievementModal({
         open: true,
         title: "Unit tugallandi!",
-        description: `Siz barcha ${lessons.length} ta darsni muvaffaqiyatli tugatdingiz. Ajoyib natija!`
+        description: `Siz barcha ${lessons.length} ta darsni 80%+ ball bilan muvaffaqiyatli tugatdingiz. Ajoyib natija!`
       });
     }
-  }, [completedLessons.length, lessons, triggerSuccessConfetti]);
+  }, [passedLessonsCount, lessons, triggerSuccessConfetti]);
 
   // Set first lesson if none selected
   useEffect(() => {
