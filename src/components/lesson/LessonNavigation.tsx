@@ -1,16 +1,16 @@
 import { motion } from 'framer-motion';
-import { CheckCircle2, Circle, PlayCircle, Lock, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Circle, PlayCircle, Lock, Video, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Progress } from '@/components/ui/progress';
 import type { Lesson } from '@/hooks/useLessons';
 
-interface LessonAccessInfo {
-  lessonId: string;
-  canAccess: boolean;
-  reason?: string;
-  requiredScore?: number;
-  currentScore?: number;
+interface LessonProgressInfo {
+  lesson_id: string;
+  score: number | null;
+  video_completed: boolean | null;
+  quiz_score: number | null;
 }
 
 interface LessonNavigationProps {
@@ -18,6 +18,7 @@ interface LessonNavigationProps {
   currentLessonId?: string;
   completedLessons?: string[];
   lessonScores?: Record<string, number>;
+  lessonProgressData?: LessonProgressInfo[];
   onSelectLesson: (lesson: Lesson) => void;
 }
 
@@ -26,8 +27,14 @@ export function LessonNavigation({
   currentLessonId, 
   completedLessons = [],
   lessonScores = {},
+  lessonProgressData = [],
   onSelectLesson 
 }: LessonNavigationProps) {
+  // Get detailed progress for a lesson
+  const getLessonProgress = (lessonId: string) => {
+    return lessonProgressData.find(p => p.lesson_id === lessonId);
+  };
+
   // Determine which lessons are locked based on previous lesson scores
   const getLessonLockStatus = (lessonIndex: number): { isLocked: boolean; reason?: string; score?: number } => {
     if (lessonIndex === 0) return { isLocked: false }; // First lesson is never locked
@@ -58,6 +65,13 @@ export function LessonNavigation({
           const isCurrent = lesson.id === currentLessonId;
           const lockStatus = getLessonLockStatus(index);
           const lessonScore = lessonScores[lesson.id];
+          const progressInfo = getLessonProgress(lesson.id);
+          
+          // Calculate video and quiz progress
+          const videoCompleted = progressInfo?.video_completed || false;
+          const quizScore = progressInfo?.quiz_score || 0;
+          const videoPoints = videoCompleted ? 20 : 0;
+          const quizPoints = Math.round((quizScore / 100) * 80);
 
           const buttonContent = (
             <motion.button
@@ -68,7 +82,7 @@ export function LessonNavigation({
               onClick={() => !lockStatus.isLocked && onSelectLesson(lesson)}
               disabled={lockStatus.isLocked}
               className={cn(
-                "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all",
+                "w-full flex items-start gap-3 p-3 rounded-lg text-left transition-all",
                 isCurrent && "bg-primary/10 border border-primary/30",
                 !isCurrent && !lockStatus.isLocked && "hover:bg-secondary/50",
                 lockStatus.isLocked && "opacity-50 cursor-not-allowed",
@@ -77,20 +91,21 @@ export function LessonNavigation({
             >
               <motion.div 
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                  isCompleted && "bg-success/20 text-success",
+                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+                  isCompleted && lessonScore >= 80 && "bg-success/20 text-success",
+                  isCompleted && lessonScore < 80 && "bg-amber-500/20 text-amber-600",
                   isCurrent && !isCompleted && "bg-primary/20 text-primary",
                   !isCurrent && !isCompleted && !lockStatus.isLocked && "bg-secondary text-muted-foreground",
                   lockStatus.isLocked && "bg-muted text-muted-foreground"
                 )}
-                animate={isCompleted ? { 
+                animate={isCompleted && lessonScore >= 80 ? { 
                   scale: [1, 1.1, 1],
                 } : {}}
                 transition={{ duration: 0.3 }}
               >
                 {lockStatus.isLocked ? (
                   <Lock className="w-4 h-4" />
-                ) : isCompleted ? (
+                ) : isCompleted && lessonScore >= 80 ? (
                   <motion.div
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
@@ -109,13 +124,16 @@ export function LessonNavigation({
                   <p className={cn(
                     "text-sm font-medium truncate",
                     isCurrent && "text-primary",
-                    isCompleted && "text-success",
+                    isCompleted && lessonScore >= 80 && "text-success",
+                    isCompleted && lessonScore < 80 && "text-amber-600",
                     lockStatus.isLocked && "text-muted-foreground"
                   )}>
                     {lesson.lesson_number}. {lesson.title}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5">
+                
+                {/* Duration and score */}
+                <div className="flex items-center gap-2 mt-1">
                   {lesson.duration_minutes && (
                     <span className="text-xs text-muted-foreground">
                       {lesson.duration_minutes} min
@@ -143,6 +161,55 @@ export function LessonNavigation({
                     </Badge>
                   )}
                 </div>
+
+                {/* Video and Quiz progress breakdown */}
+                {isCompleted && progressInfo && (
+                  <div className="mt-2 space-y-1.5">
+                    {/* Video progress */}
+                    <div className="flex items-center gap-2">
+                      <Video className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <div className="flex-1">
+                        <Progress 
+                          value={videoCompleted ? 100 : 0} 
+                          className="h-1.5" 
+                        />
+                      </div>
+                      <span className={cn(
+                        "text-[10px] font-medium min-w-[28px] text-right",
+                        videoCompleted ? "text-success" : "text-muted-foreground"
+                      )}>
+                        {videoPoints}/20
+                      </span>
+                    </div>
+                    
+                    {/* Quiz progress */}
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <div className="flex-1">
+                        <Progress 
+                          value={quizScore} 
+                          className="h-1.5" 
+                        />
+                      </div>
+                      <span className={cn(
+                        "text-[10px] font-medium min-w-[28px] text-right",
+                        quizPoints >= 64 ? "text-success" : quizPoints >= 40 ? "text-amber-600" : "text-muted-foreground"
+                      )}>
+                        {quizPoints}/80
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show progress hint for current lesson */}
+                {isCurrent && !isCompleted && (
+                  <div className="mt-2 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Video className="w-3 h-3" /> 20% + 
+                      <HelpCircle className="w-3 h-3" /> 80% = 100%
+                    </span>
+                  </div>
+                )}
               </div>
             </motion.button>
           );

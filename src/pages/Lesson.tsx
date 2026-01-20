@@ -340,6 +340,7 @@ export default function Lesson() {
                 currentLessonId={lessonId || undefined}
                 completedLessons={completedLessons}
                 lessonScores={lessonScores}
+                lessonProgressData={lessonScoresData || []}
                 onSelectLesson={handleSelectLesson}
               />
               
