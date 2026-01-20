@@ -37,7 +37,7 @@ export default function Lesson() {
   const { data: dailyLimit } = useDailyLessonLimit();
   const markLessonComplete = useMarkLessonComplete();
   const markUnitComplete = useMarkUnitComplete();
-  const { triggerSuccessConfetti } = useConfetti();
+  const { triggerSuccessConfetti, triggerLessonConfetti } = useConfetti();
   
   const [activeTab, setActiveTab] = useState('content');
   const hasTriggeredConfetti = useRef(false);
@@ -238,7 +238,17 @@ export default function Lesson() {
     // Mark lesson as complete with scores
     await markCurrentLessonCompleteWithScore(videoCompleted, percentage);
     
-    toast.success(`Test yakunlandi! Jami ball: ${totalScore}/100`);
+    // Show celebration if passed (80%+)
+    if (totalScore >= 80) {
+      triggerLessonConfetti();
+      toast.success(`🎉 Ajoyib! Dars muvaffaqiyatli tugatildi: ${totalScore}/100 ball!`, {
+        duration: 4000,
+      });
+    } else {
+      toast.warning(`Test yakunlandi: ${totalScore}/100 ball. Keyingi darsni ochish uchun 80+ ball kerak.`, {
+        duration: 4000,
+      });
+    }
   };
 
   const handleQuizRetry = () => {
