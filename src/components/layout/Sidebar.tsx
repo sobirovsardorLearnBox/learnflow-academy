@@ -17,6 +17,7 @@ import {
   UsersRound,
   CalendarCheck,
   Trophy,
+  Bell,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ const navItems = {
     { icon: Shield, label: 'Qurilmalar', path: '/admin/devices' },
     { icon: CalendarCheck, label: 'Davomat', path: '/admin/attendance' },
     { icon: BarChart3, label: 'Statistika', path: '/admin/statistics' },
+    { icon: Bell, label: 'Xabarnomalar', path: '/admin/notifications' },
     { icon: Settings, label: 'Sozlamalar', path: '/admin/settings' },
     { icon: User, label: 'Profil', path: '/profile' },
   ],

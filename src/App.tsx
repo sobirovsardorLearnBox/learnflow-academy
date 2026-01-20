@@ -27,6 +27,7 @@ import TeacherAttendance from "./pages/teacher/TeacherAttendance";
 import TeacherStatistics from "./pages/teacher/TeacherStatistics";
 import AdminAttendance from "./pages/admin/AdminAttendance";
 import AdminStatistics from "./pages/admin/AdminStatistics";
+import AdminNotifications from "./pages/admin/AdminNotifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -198,6 +199,12 @@ function AppRoutes() {
       <Route path="/admin/statistics" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminStatistics />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/notifications" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminNotifications />
         </ProtectedRoute>
       } />
 
