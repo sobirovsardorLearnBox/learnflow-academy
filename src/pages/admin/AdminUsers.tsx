@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, MoreVertical, Shield, Trash2, Loader2, Users, Clock } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -32,6 +32,7 @@ import { useAdminUsers, useUpdateUserRole, useDeleteUser } from '@/hooks/useAdmi
 import { CreateUserDialog } from '@/components/admin/CreateUserDialog';
 import { DeleteConfirmDialog } from '@/components/admin/DeleteConfirmDialog';
 import { DailyLimitDialog } from '@/components/admin/DailyLimitDialog';
+import { VirtualizedUserTable, UserData } from '@/components/admin/VirtualizedUserTable';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -41,7 +42,7 @@ export default function AdminUsers() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<{ id: string; user_id: string; name: string; role: string; daily_lesson_limit?: number } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [newRole, setNewRole] = useState<'admin' | 'teacher' | 'student'>('student');
 
   const { data: users, isLoading } = useAdminUsers();
@@ -78,14 +79,24 @@ export default function AdminUsers() {
     },
   });
 
-  // Filter users - exclude students from the main list (they're managed in groups)
-  const filteredUsers = (users || []).filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRole = selectedRole === 'all' || user.role === selectedRole;
-    return matchesSearch && matchesRole;
-  });
+  // Filter and map users for VirtualizedUserTable
+  const filteredUsers: UserData[] = useMemo(() => {
+    return (users || []).filter((user) => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+      return matchesSearch && matchesRole;
+    }).map(user => ({
+      id: user.id,
+      user_id: user.user_id,
+      name: user.name,
+      email: user.email,
+      role: user.role as 'admin' | 'teacher' | 'student',
+      daily_lesson_limit: user.daily_lesson_limit,
+      paymentStatus: user.paymentStatus as 'pending' | 'approved' | 'blocked',
+    }));
+  }, [users, searchQuery, selectedRole]);
 
   const stats = [
     { label: 'Jami foydalanuvchilar', value: users?.length || 0, color: 'text-primary' },
@@ -94,21 +105,21 @@ export default function AdminUsers() {
     { label: "Kutilayotgan to'lovlar", value: users?.filter((u) => u.paymentStatus === 'pending').length || 0, color: 'text-warning' },
   ];
 
-  const handleOpenRoleDialog = (user: typeof selectedUser) => {
+  const handleOpenRoleDialog = useCallback((user: UserData) => {
     setSelectedUser(user);
     setNewRole(user?.role as 'admin' | 'teacher' | 'student' || 'student');
     setRoleDialogOpen(true);
-  };
+  }, []);
 
-  const handleOpenDeleteDialog = (user: typeof selectedUser) => {
+  const handleOpenDeleteDialog = useCallback((user: UserData) => {
     setSelectedUser(user);
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleOpenLimitDialog = (user: typeof selectedUser) => {
+  const handleOpenLimitDialog = useCallback((user: UserData) => {
     setSelectedUser(user);
     setLimitDialogOpen(true);
-  };
+  }, []);
 
   const handleRoleChange = () => {
     if (selectedUser) {
@@ -212,6 +223,19 @@ export default function AdminUsers() {
           <div className="text-center py-12">
             <p className="text-muted-foreground">Foydalanuvchilar topilmadi.</p>
           </div>
+        ) : filteredUsers.length > 20 ? (
+          <Card>
+            <CardContent className="p-0">
+              <VirtualizedUserTable
+                users={filteredUsers}
+                userGroups={userGroups}
+                onOpenRoleDialog={handleOpenRoleDialog}
+                onOpenLimitDialog={handleOpenLimitDialog}
+                onOpenDeleteDialog={handleOpenDeleteDialog}
+                maxHeight={600}
+              />
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardContent className="p-0">
@@ -280,13 +304,7 @@ export default function AdminUsers() {
                             <Badge 
                               variant="outline" 
                               className="cursor-pointer hover:bg-primary/10"
-                              onClick={() => handleOpenLimitDialog({
-                                id: user.id,
-                                user_id: user.user_id,
-                                name: user.name,
-                                role: user.role,
-                                daily_lesson_limit: user.daily_lesson_limit
-                              })}
+                              onClick={() => handleOpenLimitDialog(user)}
                             >
                               <Clock className="w-3 h-3 mr-1" />
                               {user.daily_lesson_limit ?? 1} dars/kun
@@ -306,41 +324,19 @@ export default function AdminUsers() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => handleOpenRoleDialog({
-                                  id: user.id,
-                                  user_id: user.user_id,
-                                  name: user.name,
-                                  role: user.role,
-                                  daily_lesson_limit: user.daily_lesson_limit
-                                })}
-                              >
+                              <DropdownMenuItem onClick={() => handleOpenRoleDialog(user)}>
                                 <Shield className="w-4 h-4 mr-2" />
                                 Rolni o'zgartirish
                               </DropdownMenuItem>
                               {user.role === 'student' && (
-                                <DropdownMenuItem
-                                  onClick={() => handleOpenLimitDialog({
-                                    id: user.id,
-                                    user_id: user.user_id,
-                                    name: user.name,
-                                    role: user.role,
-                                    daily_lesson_limit: user.daily_lesson_limit
-                                  })}
-                                >
+                                <DropdownMenuItem onClick={() => handleOpenLimitDialog(user)}>
                                   <Clock className="w-4 h-4 mr-2" />
                                   Kunlik limitni o'zgartirish
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem 
                                 className="text-destructive"
-                                onClick={() => handleOpenDeleteDialog({
-                                  id: user.id,
-                                  user_id: user.user_id,
-                                  name: user.name,
-                                  role: user.role,
-                                  daily_lesson_limit: user.daily_lesson_limit
-                                })}
+                                onClick={() => handleOpenDeleteDialog(user)}
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 O'chirish
