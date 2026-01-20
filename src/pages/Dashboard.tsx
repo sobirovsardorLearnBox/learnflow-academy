@@ -34,12 +34,12 @@ export default function Dashboard() {
   const { data: sections, isLoading: sectionsLoading } = useSections();
   const { data: levels, isLoading: levelsLoading } = useLevels(selectedSection?.id);
   const { data: units, isLoading: unitsLoading } = useUnits(selectedLevel?.id);
-  const { data: userStats } = useUserStats(user?.id);
-  const { data: accessibleUnitIds } = useUserAccessibleUnits(user?.id);
-  const { data: accessibleSectionIds } = useUserAccessibleSections(user?.id);
+  const { data: userStats } = useUserStats(user?.user_id);
+  const { data: accessibleUnitIds } = useUserAccessibleUnits(user?.user_id);
+  const { data: accessibleSectionIds } = useUserAccessibleSections(user?.user_id);
   
   const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
-  const { data: unitProgress } = useUnitProgress(unitIds, user?.id);
+  const { data: unitProgress } = useUnitProgress(unitIds, user?.user_id);
 
   // Check if user is student and needs unit access restrictions
   const isStudent = user?.role === 'student';
@@ -76,10 +76,10 @@ export default function Dashboard() {
   };
 
   const stats = [
-    { label: 'Courses in Progress', value: sections?.length || 0, icon: BookOpen, color: 'from-cyan-500 to-blue-600' },
-    { label: 'Completed Lessons', value: userStats?.completedLessons || 0, icon: TrendingUp, color: 'from-emerald-500 to-teal-600' },
-    { label: 'Completed Units', value: userStats?.completedUnits || 0, icon: Trophy, color: 'from-violet-500 to-purple-600' },
-    { label: 'Achievements', value: '0', icon: CreditCard, color: 'from-rose-500 to-pink-600' },
+    { label: 'Kurslar', value: sections?.length || 0, icon: BookOpen, color: 'from-cyan-500 to-blue-600' },
+    { label: 'Tugatilgan darslar', value: userStats?.completedLessons || 0, icon: TrendingUp, color: 'from-emerald-500 to-teal-600' },
+    { label: 'Tugatilgan bo\'limlar', value: userStats?.completedUnits || 0, icon: Trophy, color: 'from-violet-500 to-purple-600' },
+    { label: 'Yutuqlar', value: '0', icon: CreditCard, color: 'from-rose-500 to-pink-600' },
   ];
 
   const transformedSections = (sections || []).map(section => {
@@ -156,14 +156,14 @@ export default function Dashboard() {
               animate={{ opacity: 1, x: 0 }}
               className="text-2xl lg:text-3xl font-bold"
             >
-              {view === 'sections' && `Welcome back, ${user.name}!`}
+              {view === 'sections' && `Xush kelibsiz, ${user.name}!`}
               {view === 'levels' && selectedSection?.name}
               {view === 'units' && selectedLevel?.name}
             </motion.h1>
             <p className="text-muted-foreground mt-1">
-              {view === 'sections' && 'Continue your learning journey'}
-              {view === 'levels' && `${levels?.length || 0} levels available`}
-              {view === 'units' && `${units?.length || 0} units in this level`}
+              {view === 'sections' && 'O\'quv jarayonini davom ettiring'}
+              {view === 'levels' && `${levels?.length || 0} ta daraja mavjud`}
+              {view === 'units' && `Bu darajada ${units?.length || 0} ta bo'lim`}
             </p>
           </div>
         </div>

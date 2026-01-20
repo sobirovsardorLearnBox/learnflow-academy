@@ -41,10 +41,10 @@ export default function Statistics() {
   const { user } = useAuth();
   const [timeRange, setTimeRange] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
 
-  const { data: dailyProgress, isLoading: dailyLoading } = useDailyProgress(user?.id, 14);
-  const { data: weeklyProgress, isLoading: weeklyLoading } = useWeeklyProgress(user?.id, 8);
-  const { data: monthlyProgress, isLoading: monthlyLoading } = useMonthlyProgress(user?.id, 6);
-  const { data: summary, isLoading: summaryLoading } = useProgressSummary(user?.id);
+  const { data: dailyProgress, isLoading: dailyLoading } = useDailyProgress(user?.user_id, 14);
+  const { data: weeklyProgress, isLoading: weeklyLoading } = useWeeklyProgress(user?.user_id, 8);
+  const { data: monthlyProgress, isLoading: monthlyLoading } = useMonthlyProgress(user?.user_id, 6);
+  const { data: summary, isLoading: summaryLoading } = useProgressSummary(user?.user_id);
 
   if (!user) return null;
 
