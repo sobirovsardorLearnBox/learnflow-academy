@@ -493,6 +493,7 @@ export default function Lesson() {
                       videoUrl={currentLesson.video_url}
                       title={currentLesson.title}
                       onComplete={handleVideoComplete}
+                      durationMinutes={currentLesson.duration_minutes || undefined}
                     />
                   ) : (
                     <Card variant="glass">
