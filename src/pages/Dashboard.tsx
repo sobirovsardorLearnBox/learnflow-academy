@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSections, useLevels, useUnits, Section, Level } from '@/hooks/useSections';
 import { useUserStats, useUnitProgress } from '@/hooks/useLessons';
 import { useUserAccessibleUnits, useUserAccessibleSections } from '@/hooks/useGroupSections';
+import { useSectionLevelCounts, useLevelUnitCounts } from '@/hooks/useContentCounts';
 import { toast } from 'sonner';
 
 const iconMap: Record<string, any> = {
@@ -41,6 +42,12 @@ export default function Dashboard() {
   
   const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
   const { data: unitProgress } = useUnitProgress(unitIds, user?.user_id);
+  
+  // Fetch dynamic counts for sections and levels
+  const sectionIds = useMemo(() => (sections || []).map(s => s.id), [sections]);
+  const levelIds = useMemo(() => (levels || []).map(l => l.id), [levels]);
+  const { data: sectionCounts } = useSectionLevelCounts(sectionIds);
+  const { data: levelCounts } = useLevelUnitCounts(levelIds);
 
   // Check if user is student and needs unit access restrictions
   const isStudent = user?.role === 'student';
@@ -86,6 +93,7 @@ export default function Dashboard() {
   const transformedSections = (sections || []).map(section => {
     // For students on dashboard, ALL sections are shown but locked if no access
     const hasAccess = !isStudent || (accessibleSectionIds || []).includes(section.id);
+    const counts = sectionCounts?.[section.id];
     
     return {
       id: section.id,
@@ -94,20 +102,23 @@ export default function Dashboard() {
       icon: iconMap[section.icon || 'Code'] || Code,
       color: 'from-primary to-accent',
       progress: 0,
-      levelsCount: 5,
+      levelsCount: counts?.levelsCount || 0,
       isLocked: isStudent && !hasAccess, // Students see all but locked if no access
     };
   });
 
-  const transformedLevels = (levels || []).map(level => ({
-    id: level.id,
-    sectionId: level.section_id,
-    title: level.name,
-    description: level.description || '',
-    progress: 0,
-    isLocked: false,
-    unitsCount: 12,
-  }));
+  const transformedLevels = (levels || []).map(level => {
+    const counts = levelCounts?.[level.id];
+    return {
+      id: level.id,
+      sectionId: level.section_id,
+      title: level.name,
+      description: level.description || '',
+      progress: 0,
+      isLocked: false,
+      unitsCount: counts?.unitsCount || 0,
+    };
+  });
 
   const transformedUnits = (units || []).map(unit => {
     const progress = unitProgress?.[unit.id];
