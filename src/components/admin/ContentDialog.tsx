@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Youtube, Send, Upload, Link } from 'lucide-react';
 interface ContentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -249,15 +250,90 @@ export function ContentDialog({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="video_url">Video URL</Label>
-                <Input
-                  id="video_url"
-                  type="url"
-                  value={formData.video_url || ''}
-                  onChange={(e) => updateField('video_url', e.target.value)}
-                  placeholder="https://youtube.com/watch?v=..."
-                />
+              {/* Video Source Type Selection */}
+              <div className="space-y-3">
+                <Label>Video manbasi</Label>
+                <Tabs 
+                  value={formData.video_type || 'youtube'} 
+                  onValueChange={(value) => updateField('video_type', value)}
+                  className="w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="youtube" className="flex items-center gap-1.5">
+                      <Youtube className="w-4 h-4" />
+                      <span className="hidden sm:inline">YouTube</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="telegram" className="flex items-center gap-1.5">
+                      <Send className="w-4 h-4" />
+                      <span className="hidden sm:inline">Telegram</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="upload" className="flex items-center gap-1.5">
+                      <Upload className="w-4 h-4" />
+                      <span className="hidden sm:inline">Yuklash</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="direct" className="flex items-center gap-1.5">
+                      <Link className="w-4 h-4" />
+                      <span className="hidden sm:inline">URL</span>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="youtube" className="space-y-2 mt-3">
+                    <Label htmlFor="video_url_youtube">YouTube havolasi</Label>
+                    <Input
+                      id="video_url_youtube"
+                      type="url"
+                      value={formData.video_url || ''}
+                      onChange={(e) => updateField('video_url', e.target.value)}
+                      placeholder="https://youtube.com/watch?v=... yoki youtu.be/..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Ochiq yoki yashirin (unlisted) YouTube video havolasini kiriting
+                    </p>
+                  </TabsContent>
+
+                  <TabsContent value="telegram" className="space-y-2 mt-3">
+                    <Label htmlFor="video_url_telegram">Telegram video havolasi</Label>
+                    <Input
+                      id="video_url_telegram"
+                      type="url"
+                      value={formData.video_url || ''}
+                      onChange={(e) => updateField('video_url', e.target.value)}
+                      placeholder="https://t.me/c/123456789/123"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Telegram kanal yoki guruhdan video havolasini kiriting. Video ochiq bo'lishi kerak.
+                    </p>
+                  </TabsContent>
+
+                  <TabsContent value="upload" className="space-y-2 mt-3">
+                    <Label htmlFor="video_url_upload">Video fayl URL</Label>
+                    <Input
+                      id="video_url_upload"
+                      type="url"
+                      value={formData.video_url || ''}
+                      onChange={(e) => updateField('video_url', e.target.value)}
+                      placeholder="https://example.com/video.mp4"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      MP4, WebM yoki OGV formatidagi video fayl havolasini kiriting. 
+                      Faylni oldindan xostingga yuklang.
+                    </p>
+                  </TabsContent>
+
+                  <TabsContent value="direct" className="space-y-2 mt-3">
+                    <Label htmlFor="video_url_direct">To'g'ridan-to'g'ri video URL</Label>
+                    <Input
+                      id="video_url_direct"
+                      type="url"
+                      value={formData.video_url || ''}
+                      onChange={(e) => updateField('video_url', e.target.value)}
+                      placeholder="https://example.com/video.mp4"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Istalgan video xizmatidan to'g'ridan-to'g'ri havola kiriting
+                    </p>
+                  </TabsContent>
+                </Tabs>
               </div>
 
               <div className="space-y-2">
