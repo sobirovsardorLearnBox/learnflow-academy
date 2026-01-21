@@ -18,6 +18,7 @@ const Lesson = lazy(() => import("./pages/Lesson"));
 const Statistics = lazy(() => import("./pages/Statistics"));
 const Leaderboard = lazy(() => import("./pages/Leaderboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Install = lazy(() => import("./pages/Install"));
 
 // Admin pages
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
@@ -123,6 +124,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Suspense fallback={<PageLoadingFallback />}><Login /></Suspense>} />
       <Route path="/setup" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Suspense fallback={<PageLoadingFallback />}><Setup /></Suspense>} />
+      <Route path="/install" element={<Suspense fallback={<PageLoadingFallback />}><Install /></Suspense>} />
       
       <Route path="/dashboard" element={
         <ProtectedRoute allowedRoles={['admin', 'teacher']}>
@@ -263,11 +265,17 @@ function AppRoutes() {
   );
 }
 
+// PWA Components
+import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <OfflineIndicator />
+      <InstallPrompt />
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />
