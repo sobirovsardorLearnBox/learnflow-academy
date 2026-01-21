@@ -1,11 +1,33 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0'
 
-// CORS headers for all responses
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+// CORS configuration with origin validation
+const ALLOWED_ORIGINS = [
+  'https://learnbox-core.lovable.app',
+  'https://id-preview--8d001eef-d6cc-49d5-a0dd-9c9d92befbcf.lovable.app',
+]
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false
+  if (ALLOWED_ORIGINS.includes(origin)) return true
+  if (origin.endsWith('.lovable.app')) return true
+  if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true
+  return false
 }
+
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin')
+  const allowedOrigin = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0]
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin || ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-request-id',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
+
+// Store current request's CORS headers (set per request)
+let corsHeaders: Record<string, string> = {}
 
 // Redis configuration
 const REDIS_URL = Deno.env.get('UPSTASH_REDIS_REST_URL') || ''
@@ -349,6 +371,9 @@ function publicCacheKey(prefix: string, ...parts: string[]): string {
 Deno.serve(async (req) => {
   const startTime = Date.now()
   const requestId = crypto.randomUUID()
+  
+  // Set CORS headers for this request
+  corsHeaders = getCorsHeaders(req)
   
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
