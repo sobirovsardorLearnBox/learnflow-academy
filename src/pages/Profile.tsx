@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Lock, Save, Loader2, Eye, EyeOff, Bell, BookOpen, Trophy, CreditCard, MessageSquare } from 'lucide-react';
+import { User, Mail, Lock, Save, Loader2, Eye, EyeOff, Bell, BookOpen, Trophy, CreditCard, MessageSquare, Smartphone } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
+import { PushNotificationToggle } from '@/components/notifications/PushNotificationToggle';
 
 export default function Profile() {
   const { user, refreshUser } = useAuth();
@@ -218,6 +219,20 @@ export default function Profile() {
                   <CardDescription>Qaysi turdagi xabarlarni olishni tanlang</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Push Notification Toggle */}
+                  <div className="flex items-center justify-between gap-4 py-3 border-b bg-primary/5 -mx-6 px-6 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                        <Smartphone className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <Label className="font-medium">Push bildirishnomalar</Label>
+                        <p className="text-sm text-muted-foreground">Brauzer yopiq bo'lganda ham bildirishnomalar oling</p>
+                      </div>
+                    </div>
+                    <PushNotificationToggle showLabel={false} />
+                  </div>
+
                   {notificationTypes.map(({ key, label, description, icon: Icon }) => (
                     <div key={key} className="flex items-center justify-between gap-4 py-3 border-b last:border-0">
                       <div className="flex items-start gap-3">
