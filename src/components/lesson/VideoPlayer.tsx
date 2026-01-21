@@ -535,23 +535,62 @@ function NativeVideoPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   );
 }
 
-// Telegram Player Component
+// Telegram Player Component with Progress Tracking
 function TelegramPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const startTimeRef = useRef<number>(Date.now());
   
-  // Auto-complete after 30 seconds (since we can't track Telegram video progress)
+  const [isLoading, setIsLoading] = useState(true);
+  const [watchedSeconds, setWatchedSeconds] = useState(0);
+  const [isWatching, setIsWatching] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  
+  // Estimated video duration (default 5 minutes, can be adjusted)
+  const estimatedDuration = 300; // 5 minutes in seconds
+  const completionThreshold = 0.6; // 60% completion triggers onComplete
+  
+  // Keep onComplete ref updated
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!hasCompletedRef.current) {
-        hasCompletedRef.current = true;
-        onComplete?.();
-      }
-    }, 30000); // 30 seconds
-
-    return () => clearTimeout(timer);
+    onCompleteRef.current = onComplete;
   }, [onComplete]);
+
+  // Track watching time when user is actively watching
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isWatching && !hasCompletedRef.current) {
+      interval = setInterval(() => {
+        setWatchedSeconds(prev => {
+          const newValue = prev + 1;
+          
+          // Check if completion threshold reached
+          if (newValue >= estimatedDuration * completionThreshold && !hasCompletedRef.current) {
+            hasCompletedRef.current = true;
+            onCompleteRef.current?.();
+          }
+          
+          return newValue;
+        });
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isWatching, estimatedDuration]);
+
+  // Auto-start watching when iframe loads
+  useEffect(() => {
+    if (!isLoading) {
+      // Start tracking after a small delay to ensure user is engaged
+      const timer = setTimeout(() => {
+        setIsWatching(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
@@ -562,23 +601,33 @@ function TelegramPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
     }
   }, []);
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progress = Math.min((watchedSeconds / estimatedDuration) * 100, 100);
   const embedUrl = getTelegramEmbedUrl(videoUrl);
 
   if (!embedUrl) {
     return (
-      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center">
-        <div className="text-center text-white p-4">
-          <Send className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-lg font-medium">Telegram video</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Video havolasi noto'g'ri formatda
+      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-[#0088cc]/20 to-[#0088cc]/5 flex items-center justify-center border border-[#0088cc]/30">
+        <div className="text-center p-6">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-[#0088cc]/20 flex items-center justify-center">
+            <Send className="w-10 h-10 text-[#0088cc]" />
+          </div>
+          <p className="text-lg font-semibold text-foreground">Telegram Video</p>
+          <p className="text-sm text-muted-foreground mt-2 max-w-xs">
+            Bu video Telegram platformasida joylashgan. Tomosha qilish uchun quyidagi tugmani bosing.
           </p>
           <a 
             href={videoUrl} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="inline-block mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+            className="inline-flex items-center gap-2 mt-6 px-6 py-3 bg-[#0088cc] text-white rounded-xl font-medium hover:bg-[#0077b5] transition-colors shadow-lg shadow-[#0088cc]/25"
           >
+            <Send className="w-4 h-4" />
             Telegramda ochish
           </a>
         </div>
@@ -589,33 +638,133 @@ function TelegramPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full aspect-video rounded-xl overflow-hidden bg-black"
+      className="relative w-full aspect-video rounded-xl overflow-hidden bg-black group"
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => isWatching && setShowControls(false)}
     >
+      {/* Loading State */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0088cc]/20 to-black z-20">
+          <div className="w-16 h-16 rounded-full bg-[#0088cc]/20 flex items-center justify-center mb-4">
+            <Send className="w-8 h-8 text-[#0088cc] animate-pulse" />
+          </div>
+          <div className="w-12 h-12 border-4 border-[#0088cc] border-t-transparent rounded-full animate-spin" />
+          <p className="text-white/80 mt-4 text-sm">Video yuklanmoqda...</p>
         </div>
       )}
       
+      {/* Telegram Embed */}
       <iframe
         src={embedUrl}
         className="w-full h-full"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
         onLoad={() => setIsLoading(false)}
         style={{ border: 'none' }}
       />
 
-      {/* Fullscreen button overlay */}
-      <div className="absolute bottom-4 right-4 z-30">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-white hover:text-white bg-black/50 hover:bg-black/70"
-          onClick={toggleFullscreen}
-        >
-          <Maximize className="w-5 h-5" />
-        </Button>
+      {/* Telegram Branding Overlay */}
+      <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-black/60 to-transparent z-10 pointer-events-none flex items-center px-4">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full bg-[#0088cc] flex items-center justify-center">
+            <Send className="w-3 h-3 text-white" />
+          </div>
+          <span className="text-white/90 text-sm font-medium">Telegram Video</span>
+        </div>
       </div>
+
+      {/* Controls Overlay */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: showControls ? 1 : 0, y: showControls ? 0 : 20 }}
+        className={cn(
+          "absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity z-30",
+          !showControls && "pointer-events-none"
+        )}
+      >
+        {/* Progress Bar */}
+        <div className="relative h-1.5 bg-white/20 rounded-full mb-3 overflow-hidden">
+          <motion.div 
+            className="absolute inset-y-0 left-0 bg-[#0088cc] rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.3 }}
+          />
+          {/* Completion marker */}
+          <div 
+            className="absolute top-0 bottom-0 w-0.5 bg-white/50"
+            style={{ left: `${completionThreshold * 100}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          {/* Left side - Time info */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {isWatching ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-white text-xs font-medium">LIVE</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                  <span className="text-white/70 text-xs">Kutilmoqda</span>
+                </div>
+              )}
+            </div>
+            <span className="text-white text-sm">
+              {formatTime(watchedSeconds)} / ~{formatTime(estimatedDuration)}
+            </span>
+          </div>
+
+          {/* Right side - Controls */}
+          <div className="flex items-center gap-2">
+            {/* Completion indicator */}
+            {hasCompletedRef.current && (
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/20 rounded-full">
+                <div className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+                  <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="text-green-400 text-xs font-medium">Tugatildi</span>
+              </div>
+            )}
+            
+            {/* Open in Telegram */}
+            <a
+              href={videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0088cc]/80 hover:bg-[#0088cc] text-white text-xs font-medium rounded-full transition-colors"
+            >
+              <Send className="w-3 h-3" />
+              Telegramda
+            </a>
+            
+            {/* Fullscreen */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-white hover:text-white hover:bg-white/20 w-8 h-8" 
+              onClick={toggleFullscreen}
+            >
+              <Maximize className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Progress percentage */}
+        <div className="flex justify-between items-center mt-2">
+          <span className="text-white/50 text-xs">
+            Video progress: {Math.round(progress)}%
+          </span>
+          <span className="text-white/50 text-xs">
+            {Math.round(completionThreshold * 100)}% da tugatilgan hisoblanadi
+          </span>
+        </div>
+      </motion.div>
     </div>
   );
 }
