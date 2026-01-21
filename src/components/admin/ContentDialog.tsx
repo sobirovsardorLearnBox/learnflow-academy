@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Youtube, Send, Upload, Link } from 'lucide-react';
+import { VideoUploader } from './VideoUploader';
 interface ContentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -305,18 +306,17 @@ export function ContentDialog({
                     </p>
                   </TabsContent>
 
-                  <TabsContent value="upload" className="space-y-2 mt-3">
-                    <Label htmlFor="video_url_upload">Video fayl URL</Label>
-                    <Input
-                      id="video_url_upload"
-                      type="url"
-                      value={formData.video_url || ''}
-                      onChange={(e) => updateField('video_url', e.target.value)}
-                      placeholder="https://example.com/video.mp4"
+                  <TabsContent value="upload" className="space-y-3 mt-3">
+                    <Label>Video yuklash</Label>
+                    <VideoUploader
+                      currentUrl={formData.video_type === 'upload' ? formData.video_url : undefined}
+                      onUploadComplete={(url) => {
+                        updateField('video_url', url);
+                        updateField('video_type', 'upload');
+                      }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      MP4, WebM yoki OGV formatidagi video fayl havolasini kiriting. 
-                      Faylni oldindan xostingga yuklang.
+                      Video faylni to'g'ridan-to'g'ri yuklang. MP4, WebM, OGG yoki MOV formatlar qabul qilinadi. Maksimum 500MB.
                     </p>
                   </TabsContent>
 
