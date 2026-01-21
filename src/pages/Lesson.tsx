@@ -388,10 +388,17 @@ export default function Lesson() {
             <div className="space-y-6">
               {/* Access Restriction Alert */}
               {lessonAccess && !lessonAccess.can_access && (
-                <Alert variant="destructive">
-                  <Lock className="h-4 w-4" />
-                  <AlertTitle>Dars qulflangan</AlertTitle>
-                  <AlertDescription>
+                <Alert variant={lessonAccess.reason === 'wait_until_tomorrow' ? 'default' : 'destructive'} 
+                       className={lessonAccess.reason === 'wait_until_tomorrow' ? 'border-amber-500/50 bg-amber-500/10' : ''}>
+                  {lessonAccess.reason === 'wait_until_tomorrow' ? (
+                    <Calendar className="h-4 w-4 text-amber-500" />
+                  ) : (
+                    <Lock className="h-4 w-4" />
+                  )}
+                  <AlertTitle className={lessonAccess.reason === 'wait_until_tomorrow' ? 'text-amber-600' : ''}>
+                    {lessonAccess.reason === 'wait_until_tomorrow' ? 'Ertaga ochiladi' : 'Dars qulflangan'}
+                  </AlertTitle>
+                  <AlertDescription className={lessonAccess.reason === 'wait_until_tomorrow' ? 'text-amber-600' : ''}>
                     {lessonAccess.reason === 'previous_lesson_not_completed' && 
                       "Oldingi darsni tugatishingiz kerak."
                     }
@@ -401,12 +408,15 @@ export default function Lesson() {
                     {lessonAccess.reason === 'previous_score_too_low' && 
                       `Oldingi darsda kamida 80% ball olishingiz kerak. Hozirgi: ${lessonAccess.current_score}%`
                     }
+                    {lessonAccess.reason === 'wait_until_tomorrow' && 
+                      `Oldingi darsni bugun tugatdingiz. Bu dars ertaga (O'zbekiston vaqti bilan) ochiladi.`
+                    }
                   </AlertDescription>
                 </Alert>
               )}
 
               {/* Daily Limit Warning */}
-              {dailyLimit && !dailyLimit.can_complete && (
+              {dailyLimit && !dailyLimit.can_complete && !lessonAccess?.reason?.includes('wait_until_tomorrow') && (
                 <Alert className="border-amber-500/50 bg-amber-500/10">
                   <Calendar className="h-4 w-4 text-amber-500" />
                   <AlertTitle className="text-amber-600">Kunlik limit</AlertTitle>

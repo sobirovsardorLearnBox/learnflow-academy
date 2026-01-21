@@ -8,8 +8,9 @@ export interface LessonAccessResult {
   prev_lesson_id?: string;
   required_score?: number;
   current_score?: number;
-  lessons_today: number;
+  lessons_today?: number;
   daily_limit: number | null;
+  next_available?: string | null;
 }
 
 export interface DailyLimitResult {
