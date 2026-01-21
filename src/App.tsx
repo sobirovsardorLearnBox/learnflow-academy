@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,31 +6,37 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
-import Login from "./pages/Login";
-import Setup from "./pages/Setup";
-import Dashboard from "./pages/Dashboard";
-import MyCourses from "./pages/MyCourses";
-import Payment from "./pages/Payment";
-import Profile from "./pages/Profile";
-import Lesson from "./pages/Lesson";
-import Statistics from "./pages/Statistics";
-import Leaderboard from "./pages/Leaderboard";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminPayments from "./pages/admin/AdminPayments";
-import AdminSections from "./pages/admin/AdminSections";
-import AdminDevices from "./pages/admin/AdminDevices";
-import AdminProgress from "./pages/admin/AdminProgress";
-import AdminSettings from "./pages/admin/AdminSettings";
-import AdminGroups from "./pages/admin/AdminGroups";
-import TeacherGroups from "./pages/teacher/TeacherGroups";
-import TeacherLessons from "./pages/teacher/TeacherLessons";
-import TeacherAttendance from "./pages/teacher/TeacherAttendance";
-import TeacherStatistics from "./pages/teacher/TeacherStatistics";
-import TeacherNotifications from "./pages/teacher/TeacherNotifications";
-import AdminAttendance from "./pages/admin/AdminAttendance";
-import AdminStatistics from "./pages/admin/AdminStatistics";
-import AdminNotifications from "./pages/admin/AdminNotifications";
-import NotFound from "./pages/NotFound";
+
+// Lazy loaded pages - reduces initial bundle size
+const Login = lazy(() => import("./pages/Login"));
+const Setup = lazy(() => import("./pages/Setup"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const MyCourses = lazy(() => import("./pages/MyCourses"));
+const Payment = lazy(() => import("./pages/Payment"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Lesson = lazy(() => import("./pages/Lesson"));
+const Statistics = lazy(() => import("./pages/Statistics"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Admin pages
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminPayments = lazy(() => import("./pages/admin/AdminPayments"));
+const AdminSections = lazy(() => import("./pages/admin/AdminSections"));
+const AdminDevices = lazy(() => import("./pages/admin/AdminDevices"));
+const AdminProgress = lazy(() => import("./pages/admin/AdminProgress"));
+const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
+const AdminGroups = lazy(() => import("./pages/admin/AdminGroups"));
+const AdminAttendance = lazy(() => import("./pages/admin/AdminAttendance"));
+const AdminStatistics = lazy(() => import("./pages/admin/AdminStatistics"));
+const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
+
+// Teacher pages
+const TeacherGroups = lazy(() => import("./pages/teacher/TeacherGroups"));
+const TeacherLessons = lazy(() => import("./pages/teacher/TeacherLessons"));
+const TeacherAttendance = lazy(() => import("./pages/teacher/TeacherAttendance"));
+const TeacherStatistics = lazy(() => import("./pages/teacher/TeacherStatistics"));
+const TeacherNotifications = lazy(() => import("./pages/teacher/TeacherNotifications"));
 
 // Optimized QueryClient with global defaults
 const queryClient = new QueryClient({
@@ -68,6 +75,18 @@ function LoadingScreen() {
   );
 }
 
+// Page loading fallback for lazy components
+function PageLoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Sahifa yuklanmoqda...</p>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) {
   const { user, isAuthenticated, isLoading } = useAuth();
   
@@ -83,7 +102,7 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode;
     return <Navigate to="/dashboard" replace />;
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<PageLoadingFallback />}>{children}</Suspense>;
 }
 
 function AppRoutes() {
@@ -102,8 +121,8 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Login />} />
-      <Route path="/setup" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Setup />} />
+      <Route path="/" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Suspense fallback={<PageLoadingFallback />}><Login /></Suspense>} />
+      <Route path="/setup" element={isAuthenticated ? <Navigate to={getDefaultRoute()} replace /> : <Suspense fallback={<PageLoadingFallback />}><Setup /></Suspense>} />
       
       <Route path="/dashboard" element={
         <ProtectedRoute allowedRoles={['admin', 'teacher']}>
@@ -239,7 +258,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      <Route path="*" element={<NotFound />} />
+      <Route path="*" element={<Suspense fallback={<PageLoadingFallback />}><NotFound /></Suspense>} />
     </Routes>
   );
 }
