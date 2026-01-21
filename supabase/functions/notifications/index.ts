@@ -1,14 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.89.0'
+import { getCorsHeaders, handleCorsPreFlight } from '../_shared/cors.ts'
 
 // Import Redis functions inline to avoid import issues
 const REDIS_URL = Deno.env.get('UPSTASH_REDIS_REST_URL') || ''
 const REDIS_TOKEN = Deno.env.get('UPSTASH_REDIS_REST_TOKEN') || ''
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-}
 
 // Redis helper functions
 async function redisExecute<T = unknown>(command: string[]): Promise<T> {
@@ -61,25 +56,24 @@ interface Notification {
   createdAt: string
 }
 
-function errorResponse(status: number, message: string) {
+function errorResponse(status: number, message: string, req: Request) {
   return new Response(
     JSON.stringify({ success: false, error: message }),
-    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    { status, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
   )
 }
 
-function successResponse(data: unknown, status = 200) {
+function successResponse(data: unknown, req: Request, status = 200) {
   return new Response(
     JSON.stringify({ success: true, data, timestamp: new Date().toISOString() }),
-    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    { status, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
   )
 }
 
 Deno.serve(async (req) => {
   // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+  const corsResponse = handleCorsPreFlight(req)
+  if (corsResponse) return corsResponse
 
   const url = new URL(req.url)
   const path = url.pathname.replace('/notifications', '')
@@ -104,7 +98,7 @@ Deno.serve(async (req) => {
     }
 
     if (!userId) {
-      return errorResponse(401, 'Authentication required')
+      return errorResponse(401, 'Authentication required', req)
     }
 
     console.log(`[Notifications] ${method} ${path} - User: ${userId}`)
@@ -121,10 +115,10 @@ Deno.serve(async (req) => {
         return successResponse({
           notifications,
           unreadCount: notifications.filter((n: Notification) => !n.read).length
-        })
+        }, req)
       } catch (error) {
         console.error('Failed to get notifications from Redis:', error)
-        return successResponse({ notifications: [], unreadCount: 0 })
+        return successResponse({ notifications: [], unreadCount: 0 }, req)
       }
     }
 
@@ -137,9 +131,9 @@ Deno.serve(async (req) => {
         const notifications = results.map(r => JSON.parse(r))
         const unreadCount = notifications.filter((n: Notification) => !n.read).length
         
-        return successResponse({ unreadCount })
+        return successResponse({ unreadCount }, req)
       } catch (error) {
-        return successResponse({ unreadCount: 0 })
+        return successResponse({ unreadCount: 0 }, req)
       }
     }
 
@@ -149,7 +143,7 @@ Deno.serve(async (req) => {
       const notificationId = body.notification_id
       
       if (!notificationId) {
-        return errorResponse(400, 'notification_id required')
+        return errorResponse(400, 'notification_id required', req)
       }
 
       const key = `notifications:${userId}`
@@ -174,10 +168,10 @@ Deno.serve(async (req) => {
           await redisExecute(['EXPIRE', key, String(86400 * 7)]) // 7 days
         }
         
-        return successResponse({ marked: true })
+        return successResponse({ marked: true }, req)
       } catch (error) {
         console.error('Failed to mark notification as read:', error)
-        return errorResponse(500, 'Failed to mark as read')
+        return errorResponse(500, 'Failed to mark as read', req)
       }
     }
 
@@ -199,10 +193,10 @@ Deno.serve(async (req) => {
           await redisExecute(['EXPIRE', key, String(86400 * 7)])
         }
         
-        return successResponse({ markedAll: true })
+        return successResponse({ markedAll: true }, req)
       } catch (error) {
         console.error('Failed to mark all as read:', error)
-        return errorResponse(500, 'Failed to mark all as read')
+        return errorResponse(500, 'Failed to mark all as read', req)
       }
     }
 
@@ -210,9 +204,9 @@ Deno.serve(async (req) => {
     if (path === '/clear' && method === 'DELETE') {
       try {
         await redisExecute(['DEL', `notifications:${userId}`])
-        return successResponse({ cleared: true })
+        return successResponse({ cleared: true }, req)
       } catch (error) {
-        return errorResponse(500, 'Failed to clear notifications')
+        return errorResponse(500, 'Failed to clear notifications', req)
       }
     }
 
@@ -226,14 +220,14 @@ Deno.serve(async (req) => {
         .single()
 
       if (!roleData || !['admin', 'teacher'].includes(roleData.role)) {
-        return errorResponse(403, 'Admin or teacher access required')
+        return errorResponse(403, 'Admin or teacher access required', req)
       }
 
       const body = await req.json()
       const { target_user_id, target_group_id, type, title, message, data } = body
 
       if (!type || !title || !message) {
-        return errorResponse(400, 'type, title, and message are required')
+        return errorResponse(400, 'type, title, and message are required', req)
       }
 
       const notification: Notification = {
@@ -285,23 +279,23 @@ Deno.serve(async (req) => {
 
       console.log(`[Notifications] Sent to ${sentTo.length} users: ${type}`)
       
-      return successResponse({ sent: true, recipientCount: sentTo.length })
+      return successResponse({ sent: true, recipientCount: sentTo.length }, req)
     }
 
     // ============= HEALTH CHECK =============
     if (path === '/health' && method === 'GET') {
       try {
         await redisExecute(['PING'])
-        return successResponse({ status: 'healthy', redis: 'connected' })
+        return successResponse({ status: 'healthy', redis: 'connected' }, req)
       } catch (error) {
-        return successResponse({ status: 'degraded', redis: 'disconnected' })
+        return successResponse({ status: 'degraded', redis: 'disconnected' }, req)
       }
     }
 
-    return errorResponse(404, 'Endpoint not found')
+    return errorResponse(404, 'Endpoint not found', req)
 
   } catch (error) {
     console.error('[Notifications] Error:', error)
-    return errorResponse(500, error instanceof Error ? error.message : 'Internal server error')
+    return errorResponse(500, error instanceof Error ? error.message : 'Internal server error', req)
   }
 })
