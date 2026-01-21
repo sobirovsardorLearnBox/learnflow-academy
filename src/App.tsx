@@ -31,6 +31,7 @@ const AdminGroups = lazy(() => import("./pages/admin/AdminGroups"));
 const AdminAttendance = lazy(() => import("./pages/admin/AdminAttendance"));
 const AdminStatistics = lazy(() => import("./pages/admin/AdminStatistics"));
 const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminVideos = lazy(() => import("./pages/admin/AdminVideos"));
 
 // Teacher pages
 const TeacherGroups = lazy(() => import("./pages/teacher/TeacherGroups"));
@@ -257,6 +258,12 @@ function AppRoutes() {
       <Route path="/admin/notifications" element={
         <ProtectedRoute allowedRoles={['admin']}>
           <AdminNotifications />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/videos" element={
+        <ProtectedRoute allowedRoles={['admin']}>
+          <AdminVideos />
         </ProtectedRoute>
       } />
 

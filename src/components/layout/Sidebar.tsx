@@ -18,6 +18,7 @@ import {
   CalendarCheck,
   Trophy,
   Bell,
+  Video,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,7 @@ const navItems = {
     { icon: Users, label: 'Foydalanuvchilar', path: '/admin/users' },
     { icon: UsersRound, label: 'Guruhlar', path: '/admin/groups' },
     { icon: GraduationCap, label: "Bo'limlar", path: '/admin/sections' },
+    { icon: Video, label: 'Videolar', path: '/admin/videos' },
     { icon: CreditCard, label: "To'lovlar", path: '/admin/payments' },
     { icon: Shield, label: 'Qurilmalar', path: '/admin/devices' },
     { icon: CalendarCheck, label: 'Davomat', path: '/admin/attendance' },
