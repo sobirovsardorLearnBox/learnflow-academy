@@ -268,17 +268,22 @@ function AppRoutes() {
 // PWA Components
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { SyncIndicator } from "@/components/pwa/SyncIndicator";
+import { BackgroundSyncProvider } from "@/contexts/BackgroundSyncContext";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <OfflineIndicator />
-      <InstallPrompt />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <BackgroundSyncProvider>
+            <OfflineIndicator />
+            <InstallPrompt />
+            <SyncIndicator />
+            <AppRoutes />
+          </BackgroundSyncProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
