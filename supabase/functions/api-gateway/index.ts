@@ -108,8 +108,23 @@ const RATE_LIMIT_STRICT_MAX = 10 // for sensitive endpoints
 // In-memory fallback rate limit store
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
-// In-memory fallback cache
-const memoryCache = new Map<string, { data: unknown; expiry: number }>()
+// In-memory fallback cache with LRU-like cleanup
+const MAX_MEMORY_CACHE_SIZE = 500
+const memoryCache = new Map<string, { data: unknown; expiry: number; hits: number }>()
+
+// Cache TTL configuration (in seconds)
+const CACHE_CONFIG = {
+  leaderboard: 30,        // 30 seconds - frequently updated
+  dashboard_stats: 60,    // 1 minute
+  sections: 300,          // 5 minutes - rarely changes
+  levels: 300,            // 5 minutes
+  units: 300,             // 5 minutes
+  lessons: 180,           // 3 minutes
+  user_progress: 60,      // 1 minute - user specific
+  user_groups: 120,       // 2 minutes
+  group_members: 120,     // 2 minutes
+  quiz_questions: 300,    // 5 minutes
+} as const
 
 // Request logging
 interface RequestLog {
@@ -123,6 +138,7 @@ interface RequestLog {
   error?: string
   cached?: boolean
   cacheType?: 'redis' | 'memory'
+  cacheKey?: string
 }
 
 function logRequest(log: RequestLog) {
@@ -249,7 +265,7 @@ function successResponse(data: unknown, status = 200, extraHeaders?: Record<stri
   )
 }
 
-// Multi-layer cache getter
+// Multi-layer cache getter with hit tracking
 async function getCached<T>(key: string): Promise<{ data: T | null; source: 'redis' | 'memory' | null }> {
   // Try Redis first
   if (REDIS_ENABLED) {
@@ -262,6 +278,7 @@ async function getCached<T>(key: string): Promise<{ data: T | null; source: 'red
   // Fallback to memory cache
   const memData = memoryCache.get(key)
   if (memData && Date.now() <= memData.expiry) {
+    memData.hits++
     return { data: memData.data as T, source: 'memory' }
   }
   
@@ -269,15 +286,37 @@ async function getCached<T>(key: string): Promise<{ data: T | null; source: 'red
   return { data: null, source: null }
 }
 
-// Multi-layer cache setter
+// Multi-layer cache setter with LRU cleanup
 async function setCache(key: string, data: unknown, ttlSeconds: number): Promise<void> {
   // Set in Redis if available
   if (REDIS_ENABLED) {
     await redisSet(key, data, ttlSeconds)
   }
   
-  // Also set in memory cache as fallback
-  memoryCache.set(key, { data, expiry: Date.now() + (ttlSeconds * 1000) })
+  // LRU-like cleanup if memory cache is too large
+  if (memoryCache.size >= MAX_MEMORY_CACHE_SIZE) {
+    const now = Date.now()
+    let lowestHits = Infinity
+    let lowestHitsKey: string | null = null
+    
+    // Remove expired entries and find lowest hit entry
+    for (const [k, v] of memoryCache) {
+      if (now > v.expiry) {
+        memoryCache.delete(k)
+      } else if (v.hits < lowestHits) {
+        lowestHits = v.hits
+        lowestHitsKey = k
+      }
+    }
+    
+    // If still too large, remove lowest hit entry
+    if (memoryCache.size >= MAX_MEMORY_CACHE_SIZE && lowestHitsKey) {
+      memoryCache.delete(lowestHitsKey)
+    }
+  }
+  
+  // Set in memory cache as fallback
+  memoryCache.set(key, { data, expiry: Date.now() + (ttlSeconds * 1000), hits: 1 })
 }
 
 // Invalidate cache pattern
@@ -288,11 +327,22 @@ async function invalidateCache(pattern: string): Promise<void> {
   }
   
   // Memory cache invalidation
+  const searchPattern = pattern.replace('*', '')
   for (const key of memoryCache.keys()) {
-    if (key.includes(pattern.replace('*', ''))) {
+    if (key.includes(searchPattern)) {
       memoryCache.delete(key)
     }
   }
+}
+
+// Generate cache key for user-specific data
+function userCacheKey(prefix: string, userId: string, ...parts: string[]): string {
+  return `${prefix}:${userId}:${parts.join(':')}`
+}
+
+// Generate cache key for public data
+function publicCacheKey(prefix: string, ...parts: string[]): string {
+  return `${prefix}:${parts.join(':')}`
 }
 
 // Main handler
@@ -523,6 +573,325 @@ Deno.serve(async (req) => {
       
       logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
       return successResponse(health)
+    }
+    
+    // ==================== SECTIONS ENDPOINT (CACHED) ====================
+    if (path === '/sections' && method === 'GET') {
+      const cacheKey = publicCacheKey('sections', 'all')
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT', 'X-Cache-Source': cachedResult.source || 'unknown' } }
+        )
+      }
+      
+      const { data, error } = await supabaseClient
+        .from('sections')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+      
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.sections)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== LEVELS ENDPOINT (CACHED) ====================
+    if (path === '/levels' && method === 'GET') {
+      const sectionId = url.searchParams.get('section_id')
+      
+      if (sectionId && !validateUUID(sectionId)) {
+        return errorResponse(400, 'Invalid section_id format')
+      }
+      
+      const cacheKey = publicCacheKey('levels', sectionId || 'all')
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      let query = supabaseClient
+        .from('levels')
+        .select('*')
+        .eq('is_active', true)
+        .order('level_number', { ascending: true })
+      
+      if (sectionId) {
+        query = query.eq('section_id', sectionId)
+      }
+      
+      const { data, error } = await query
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.levels)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== UNITS ENDPOINT (CACHED) ====================
+    if (path === '/units' && method === 'GET') {
+      const levelId = url.searchParams.get('level_id')
+      
+      if (levelId && !validateUUID(levelId)) {
+        return errorResponse(400, 'Invalid level_id format')
+      }
+      
+      const cacheKey = publicCacheKey('units', levelId || 'all')
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      let query = supabaseClient
+        .from('units')
+        .select('*')
+        .eq('is_active', true)
+        .order('unit_number', { ascending: true })
+      
+      if (levelId) {
+        query = query.eq('level_id', levelId)
+      }
+      
+      const { data, error } = await query
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.units)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== LESSONS ENDPOINT (CACHED) ====================
+    if (path === '/lessons' && method === 'GET') {
+      const unitId = url.searchParams.get('unit_id')
+      
+      if (unitId && !validateUUID(unitId)) {
+        return errorResponse(400, 'Invalid unit_id format')
+      }
+      
+      const cacheKey = publicCacheKey('lessons', unitId || 'all')
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      let query = supabaseClient
+        .from('lessons')
+        .select('id, title, description, lesson_number, duration_minutes, video_url, unit_id, is_active')
+        .eq('is_active', true)
+        .order('lesson_number', { ascending: true })
+      
+      if (unitId) {
+        query = query.eq('unit_id', unitId)
+      }
+      
+      const { data, error } = await query
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.lessons)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== USER PROGRESS ENDPOINT (CACHED) ====================
+    if (path === '/user-progress' && method === 'GET') {
+      if (!userId) {
+        return errorResponse(401, 'Authentication required')
+      }
+      
+      const unitId = url.searchParams.get('unit_id')
+      const cacheKey = userCacheKey('progress', userId, unitId || 'all')
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      let query = supabaseClient
+        .from('lesson_progress')
+        .select('*')
+        .eq('user_id', userId)
+      
+      if (unitId) {
+        if (!validateUUID(unitId)) {
+          return errorResponse(400, 'Invalid unit_id format')
+        }
+        // Get lessons for the unit first
+        const { data: lessons } = await supabaseClient
+          .from('lessons')
+          .select('id')
+          .eq('unit_id', unitId)
+        
+        if (lessons && lessons.length > 0) {
+          query = query.in('lesson_id', lessons.map(l => l.id))
+        }
+      }
+      
+      const { data, error } = await query
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.user_progress)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== USER GROUPS ENDPOINT (CACHED) ====================
+    if (path === '/user-groups' && method === 'GET') {
+      if (!userId) {
+        return errorResponse(401, 'Authentication required')
+      }
+      
+      const cacheKey = userCacheKey('groups', userId)
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      const { data, error } = await supabaseClient
+        .from('group_members')
+        .select(`
+          group_id,
+          is_approved,
+          joined_at,
+          groups (
+            id,
+            name,
+            description,
+            is_active,
+            teacher_id
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('is_approved', true)
+      
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.user_groups)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== QUIZ QUESTIONS ENDPOINT (CACHED) ====================
+    if (path === '/quiz-questions' && method === 'GET') {
+      const lessonId = url.searchParams.get('lesson_id')
+      
+      if (!lessonId || !validateUUID(lessonId)) {
+        return errorResponse(400, 'Valid lesson_id is required')
+      }
+      
+      const cacheKey = publicCacheKey('quiz', lessonId)
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      const { data, error } = await supabaseClient.rpc('get_quiz_questions', {
+        p_lesson_id: lessonId
+      })
+      
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.quiz_questions)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== CACHE STATS ENDPOINT (ADMIN ONLY) ====================
+    if (path === '/cache-stats' && method === 'GET') {
+      if (!userId || userRole !== 'admin') {
+        return errorResponse(403, 'Admin access required')
+      }
+      
+      const stats = {
+        memory_cache: {
+          size: memoryCache.size,
+          max_size: MAX_MEMORY_CACHE_SIZE,
+          keys: Array.from(memoryCache.keys()).slice(0, 50)
+        },
+        rate_limit_entries: rateLimitStore.size,
+        redis_enabled: REDIS_ENABLED,
+        cache_config: CACHE_CONFIG,
+        timestamp: new Date().toISOString()
+      }
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
+      return successResponse(stats)
+    }
+    
+    // ==================== CACHE INVALIDATION ENDPOINT (ADMIN ONLY) ====================
+    if (path === '/cache/invalidate' && method === 'POST') {
+      if (!userId || userRole !== 'admin') {
+        return errorResponse(403, 'Admin access required')
+      }
+      
+      const body = await req.json()
+      const pattern = body.pattern || '*'
+      
+      await invalidateCache(pattern)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
+      return successResponse({ invalidated: true, pattern })
     }
     
     // ==================== PROGRESS SYNC ENDPOINT ====================
