@@ -87,6 +87,23 @@ export default function Profile() {
 
     setIsChangingPassword(true);
     try {
+      // Step 1: Verify current password by re-authenticating
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser?.email) {
+        throw new Error('User email not found');
+      }
+
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: currentUser.email,
+        password: passwordData.currentPassword,
+      });
+
+      if (verifyError) {
+        toast.error('Joriy parol noto\'g\'ri');
+        return;
+      }
+
+      // Step 2: Only then update to new password
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword,
       });
