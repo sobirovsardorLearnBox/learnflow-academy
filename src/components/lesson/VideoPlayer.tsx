@@ -9,6 +9,7 @@ interface VideoPlayerProps {
   videoUrl: string;
   title?: string;
   onComplete?: () => void;
+  durationMinutes?: number; // Lesson duration in minutes for progress tracking
 }
 
 declare global {
@@ -536,7 +537,7 @@ function NativeVideoPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
 }
 
 // Telegram Player Component with Progress Tracking
-function TelegramPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
+function TelegramPlayer({ videoUrl, title, onComplete, durationMinutes }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onCompleteRef = useRef(onComplete);
   const hasCompletedRef = useRef(false);
@@ -547,8 +548,8 @@ function TelegramPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   const [isWatching, setIsWatching] = useState(false);
   const [showControls, setShowControls] = useState(true);
   
-  // Estimated video duration (default 5 minutes, can be adjusted)
-  const estimatedDuration = 300; // 5 minutes in seconds
+  // Use provided duration or default to 5 minutes
+  const estimatedDuration = durationMinutes ? durationMinutes * 60 : 300; // Convert to seconds
   const completionThreshold = 0.6; // 60% completion triggers onComplete
   
   // Keep onComplete ref updated
@@ -770,7 +771,7 @@ function TelegramPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
 }
 
 // Main VideoPlayer Component
-export function VideoPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
+export function VideoPlayer({ videoUrl, title, onComplete, durationMinutes }: VideoPlayerProps) {
   if (!videoUrl) {
     return (
       <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-muted flex items-center justify-center">
@@ -780,12 +781,12 @@ export function VideoPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   }
 
   if (isYouTubeUrl(videoUrl)) {
-    return <YouTubePlayer videoUrl={videoUrl} title={title} onComplete={onComplete} />;
+    return <YouTubePlayer videoUrl={videoUrl} title={title} onComplete={onComplete} durationMinutes={durationMinutes} />;
   }
 
   if (isTelegramUrl(videoUrl)) {
-    return <TelegramPlayer videoUrl={videoUrl} title={title} onComplete={onComplete} />;
+    return <TelegramPlayer videoUrl={videoUrl} title={title} onComplete={onComplete} durationMinutes={durationMinutes} />;
   }
 
-  return <NativeVideoPlayer videoUrl={videoUrl} title={title} onComplete={onComplete} />;
+  return <NativeVideoPlayer videoUrl={videoUrl} title={title} onComplete={onComplete} durationMinutes={durationMinutes} />;
 }

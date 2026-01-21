@@ -337,15 +337,24 @@ export function ContentDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="duration_minutes">Duration (minutes)</Label>
+                <Label htmlFor="duration_minutes" className="flex items-center gap-2">
+                  Video davomiyligi (daqiqa) 
+                  <span className="text-xs text-muted-foreground font-normal">
+                    *Telegram uchun muhim
+                  </span>
+                </Label>
                 <Input
                   id="duration_minutes"
                   type="number"
                   value={formData.duration_minutes || ''}
                   onChange={(e) => updateField('duration_minutes', parseInt(e.target.value) || null)}
                   min={1}
-                  placeholder="e.g., 15"
+                  placeholder="Masalan: 15"
+                  className="max-w-[200px]"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Video davomiyligini kiriting. Telegram videolar uchun bu qiymat progress hisoblash uchun ishlatiladi.
+                </p>
               </div>
 
               <div className="space-y-2">
