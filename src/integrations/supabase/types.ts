@@ -285,6 +285,7 @@ export type Database = {
           title: string
           unit_id: string
           updated_at: string
+          video_type: string
           video_url: string | null
         }
         Insert: {
@@ -298,6 +299,7 @@ export type Database = {
           title: string
           unit_id: string
           updated_at?: string
+          video_type?: string
           video_url?: string | null
         }
         Update: {
@@ -311,6 +313,7 @@ export type Database = {
           title?: string
           unit_id?: string
           updated_at?: string
+          video_type?: string
           video_url?: string | null
         }
         Relationships: [

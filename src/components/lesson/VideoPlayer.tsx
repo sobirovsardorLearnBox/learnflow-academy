@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,29 @@ const getYouTubeVideoId = (url: string): string | null => {
 // Check if URL is YouTube
 const isYouTubeUrl = (url: string): boolean => {
   return url?.includes('youtube.com') || url?.includes('youtu.be');
+};
+
+// Check if URL is Telegram
+const isTelegramUrl = (url: string): boolean => {
+  return url?.includes('t.me/') || url?.includes('telegram.me/');
+};
+
+// Extract Telegram video embed URL
+const getTelegramEmbedUrl = (url: string): string | null => {
+  // Format: https://t.me/channel/messageId or https://t.me/c/channelId/messageId
+  const match = url.match(/t\.me\/(c\/)?([^\/]+)\/(\d+)/);
+  if (match) {
+    const isPrivate = !!match[1];
+    const channel = match[2];
+    const messageId = match[3];
+    if (isPrivate) {
+      // Private channel format
+      return `https://t.me/${channel}/${messageId}?embed=1`;
+    }
+    // Public channel format
+    return `https://t.me/${channel}/${messageId}?embed=1`;
+  }
+  return null;
 };
 
 // YouTube Player Component
@@ -512,10 +535,107 @@ function NativeVideoPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
   );
 }
 
+// Telegram Player Component
+function TelegramPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasCompletedRef = useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Auto-complete after 30 seconds (since we can't track Telegram video progress)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!hasCompletedRef.current) {
+        hasCompletedRef.current = true;
+        onComplete?.();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      containerRef.current.requestFullscreen();
+    }
+  }, []);
+
+  const embedUrl = getTelegramEmbedUrl(videoUrl);
+
+  if (!embedUrl) {
+    return (
+      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center">
+        <div className="text-center text-white p-4">
+          <Send className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-lg font-medium">Telegram video</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Video havolasi noto'g'ri formatda
+          </p>
+          <a 
+            href={videoUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-block mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+          >
+            Telegramda ochish
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full aspect-video rounded-xl overflow-hidden bg-black"
+    >
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      
+      <iframe
+        src={embedUrl}
+        className="w-full h-full"
+        allowFullScreen
+        onLoad={() => setIsLoading(false)}
+        style={{ border: 'none' }}
+      />
+
+      {/* Fullscreen button overlay */}
+      <div className="absolute bottom-4 right-4 z-30">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-white hover:text-white bg-black/50 hover:bg-black/70"
+          onClick={toggleFullscreen}
+        >
+          <Maximize className="w-5 h-5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // Main VideoPlayer Component
 export function VideoPlayer({ videoUrl, title, onComplete }: VideoPlayerProps) {
+  if (!videoUrl) {
+    return (
+      <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-muted flex items-center justify-center">
+        <p className="text-muted-foreground">Video mavjud emas</p>
+      </div>
+    );
+  }
+
   if (isYouTubeUrl(videoUrl)) {
     return <YouTubePlayer videoUrl={videoUrl} title={title} onComplete={onComplete} />;
+  }
+
+  if (isTelegramUrl(videoUrl)) {
+    return <TelegramPlayer videoUrl={videoUrl} title={title} onComplete={onComplete} />;
   }
 
   return <NativeVideoPlayer videoUrl={videoUrl} title={title} onComplete={onComplete} />;
