@@ -310,13 +310,17 @@ export function ContentDialog({
                     <Label>Video yuklash</Label>
                     <VideoUploader
                       currentUrl={formData.video_type === 'upload' ? formData.video_url : undefined}
-                      onUploadComplete={(url) => {
+                      currentThumbnailUrl={formData.thumbnail_url}
+                      onUploadComplete={(url, thumbnailUrl) => {
                         updateField('video_url', url);
                         updateField('video_type', 'upload');
+                        if (thumbnailUrl) {
+                          updateField('thumbnail_url', thumbnailUrl);
+                        }
                       }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Video faylni to'g'ridan-to'g'ri yuklang. MP4, WebM, OGG yoki MOV formatlar qabul qilinadi. Maksimum 500MB.
+                      Video faylni to'g'ridan-to'g'ri yuklang. MP4, WebM, OGG yoki MOV formatlar qabul qilinadi. Maksimum 500MB. Thumbnail avtomatik yaratiladi.
                     </p>
                   </TabsContent>
 

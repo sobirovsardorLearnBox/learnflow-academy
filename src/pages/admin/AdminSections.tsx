@@ -268,7 +268,19 @@ function SortableLessonItem({
         <button {...attributes} {...listeners} className="cursor-grab touch-none" onClick={(e) => e.stopPropagation()}>
           <GripVertical className="w-3 h-3 text-muted-foreground" />
         </button>
-        <Play className="w-3 h-3 text-primary" />
+        {/* Thumbnail or icon */}
+        {lesson.thumbnail_url ? (
+          <div className="w-8 h-5 rounded overflow-hidden bg-muted shrink-0">
+            <img 
+              src={lesson.thumbnail_url} 
+              alt={lesson.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <Play className="w-3 h-3 text-primary" />
+        )}
         <span className="text-xs font-medium">{lesson.lesson_number}. {lesson.title}</span>
         {lesson.duration_minutes && (
           <span className="text-xs text-muted-foreground">{lesson.duration_minutes}min</span>

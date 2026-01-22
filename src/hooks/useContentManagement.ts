@@ -40,6 +40,8 @@ export interface Lesson {
   title: string;
   description: string | null;
   video_url: string | null;
+  video_type: string;
+  thumbnail_url: string | null;
   content: string | null;
   duration_minutes: number | null;
   is_active: boolean;
