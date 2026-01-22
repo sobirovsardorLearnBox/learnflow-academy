@@ -20,6 +20,7 @@ interface Lesson {
   title: string;
   description: string | null;
   video_url: string | null;
+  thumbnail_url: string | null;
   content: string | null;
   lesson_number: number;
   duration_minutes: number | null;
@@ -257,7 +258,16 @@ export default function TeacherLessons() {
                                         className="flex items-center justify-between bg-background p-3 rounded-md hover:bg-muted/50 transition-colors"
                                       >
                                         <div className="flex items-center gap-3">
-                                          {lesson.video_url ? (
+                                          {lesson.thumbnail_url ? (
+                                            <div className="w-10 h-6 rounded overflow-hidden bg-muted shrink-0">
+                                              <img 
+                                                src={lesson.thumbnail_url} 
+                                                alt={lesson.title}
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                              />
+                                            </div>
+                                          ) : lesson.video_url ? (
                                             <Video className="w-4 h-4 text-primary" />
                                           ) : (
                                             <FileText className="w-4 h-4 text-muted-foreground" />

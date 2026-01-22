@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, PlayCircle, Lock, Video, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -6,6 +6,59 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
 import type { Lesson } from '@/hooks/useLessons';
+
+// Thumbnail component with fallback
+const LessonThumbnail = memo(function LessonThumbnail({ 
+  src, 
+  title,
+  isCompleted,
+  lessonScore 
+}: { 
+  src?: string | null; 
+  title: string;
+  isCompleted: boolean;
+  lessonScore?: number;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!src || hasError) {
+    return (
+      <div className={cn(
+        "w-16 h-10 rounded-md flex items-center justify-center shrink-0",
+        isCompleted && (lessonScore || 0) >= 80 && "bg-success/20",
+        isCompleted && (lessonScore || 0) < 80 && "bg-amber-500/20",
+        !isCompleted && "bg-muted"
+      )}>
+        <Video className={cn(
+          "w-4 h-4",
+          isCompleted && (lessonScore || 0) >= 80 && "text-success",
+          isCompleted && (lessonScore || 0) < 80 && "text-amber-600",
+          !isCompleted && "text-muted-foreground"
+        )} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-16 h-10 rounded-md overflow-hidden shrink-0 bg-muted">
+      <img 
+        src={src} 
+        alt={title}
+        className="w-full h-full object-cover"
+        onError={() => setHasError(true)}
+        loading="lazy"
+      />
+      {isCompleted && (
+        <div className={cn(
+          "absolute inset-0 flex items-center justify-center",
+          (lessonScore || 0) >= 80 ? "bg-success/60" : "bg-amber-500/60"
+        )}>
+          <CheckCircle2 className="w-4 h-4 text-white" />
+        </div>
+      )}
+    </div>
+  );
+});
 
 interface LessonProgressInfo {
   lesson_id: string;
@@ -64,36 +117,46 @@ const LessonItem = memo(function LessonItem({
         isCompleted && !isCurrent && "bg-success/5 border border-success/20"
       )}
     >
-      <motion.div 
-        className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-          isCompleted && (lessonScore || 0) >= 80 && "bg-success/20 text-success",
-          isCompleted && (lessonScore || 0) < 80 && "bg-amber-500/20 text-amber-600",
-          isCurrent && !isCompleted && "bg-primary/20 text-primary",
-          !isCurrent && !isCompleted && !lockStatus.isLocked && "bg-secondary text-muted-foreground",
-          lockStatus.isLocked && "bg-muted text-muted-foreground"
-        )}
-        animate={isCompleted && (lessonScore || 0) >= 80 ? { 
-          scale: [1, 1.1, 1],
-        } : {}}
-        transition={{ duration: 0.3 }}
-      >
-        {lockStatus.isLocked ? (
-          <Lock className="w-4 h-4" />
-        ) : isCompleted && (lessonScore || 0) >= 80 ? (
-          <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-          >
-            <CheckCircle2 className="w-5 h-5" />
-          </motion.div>
-        ) : isCurrent ? (
-          <PlayCircle className="w-5 h-5" />
-        ) : (
-          <Circle className="w-4 h-4" />
-        )}
-      </motion.div>
+      {/* Thumbnail or status icon */}
+      {lesson.thumbnail_url ? (
+        <LessonThumbnail 
+          src={lesson.thumbnail_url} 
+          title={lesson.title}
+          isCompleted={isCompleted}
+          lessonScore={lessonScore}
+        />
+      ) : (
+        <motion.div 
+          className={cn(
+            "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
+            isCompleted && (lessonScore || 0) >= 80 && "bg-success/20 text-success",
+            isCompleted && (lessonScore || 0) < 80 && "bg-amber-500/20 text-amber-600",
+            isCurrent && !isCompleted && "bg-primary/20 text-primary",
+            !isCurrent && !isCompleted && !lockStatus.isLocked && "bg-secondary text-muted-foreground",
+            lockStatus.isLocked && "bg-muted text-muted-foreground"
+          )}
+          animate={isCompleted && (lessonScore || 0) >= 80 ? { 
+            scale: [1, 1.1, 1],
+          } : {}}
+          transition={{ duration: 0.3 }}
+        >
+          {lockStatus.isLocked ? (
+            <Lock className="w-4 h-4" />
+          ) : isCompleted && (lessonScore || 0) >= 80 ? (
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            >
+              <CheckCircle2 className="w-5 h-5" />
+            </motion.div>
+          ) : isCurrent ? (
+            <PlayCircle className="w-5 h-5" />
+          ) : (
+            <Circle className="w-4 h-4" />
+          )}
+        </motion.div>
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className={cn(
