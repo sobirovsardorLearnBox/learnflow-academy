@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Youtube, Send, Upload, Link } from 'lucide-react';
+import { Youtube, Send, Upload, Link, ImageIcon, Loader2, CheckCircle2, X } from 'lucide-react';
 import { VideoUploader } from './VideoUploader';
+import { isYouTubeUrl, getBestYouTubeThumbnail, getYouTubeThumbnailUrl } from '@/lib/video-thumbnails';
+import { toast } from 'sonner';
+
 interface ContentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,6 +45,7 @@ export function ContentDialog({
   isLoading,
 }: ContentDialogProps) {
   const [formData, setFormData] = useState<any>({});
+  const [isFetchingThumbnail, setIsFetchingThumbnail] = useState(false);
 
   useEffect(() => {
     if (mode === 'edit' && data) {
@@ -72,9 +76,50 @@ export function ContentDialog({
     return `${action} ${type.charAt(0).toUpperCase() + type.slice(1)}`;
   };
 
+  // Fetch YouTube thumbnail when URL changes
+  const fetchYouTubeThumbnail = useCallback(async (url: string) => {
+    if (!url || !isYouTubeUrl(url)) return;
+    
+    setIsFetchingThumbnail(true);
+    try {
+      const thumbnailUrl = await getBestYouTubeThumbnail(url);
+      if (thumbnailUrl) {
+        updateField('thumbnail_url', thumbnailUrl);
+        toast.success('YouTube thumbnail avtomatik olindi!');
+      }
+    } catch (error) {
+      console.error('Failed to fetch YouTube thumbnail:', error);
+      // Fallback to simple URL
+      const fallback = getYouTubeThumbnailUrl(url, 'high');
+      if (fallback) {
+        updateField('thumbnail_url', fallback);
+      }
+    } finally {
+      setIsFetchingThumbnail(false);
+    }
+  }, []);
+
+  // Handle YouTube URL change with debounce
+  const handleYouTubeUrlChange = useCallback((url: string) => {
+    updateField('video_url', url);
+    
+    // Only auto-fetch if URL looks complete
+    if (url && isYouTubeUrl(url) && (url.includes('watch?v=') || url.includes('youtu.be/'))) {
+      // Small delay to avoid fetching on every keystroke
+      const timeoutId = setTimeout(() => {
+        fetchYouTubeThumbnail(url);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [fetchYouTubeThumbnail]);
+
+  const clearThumbnail = () => {
+    updateField('thumbnail_url', null);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{getTitle()}</DialogTitle>
         </DialogHeader>
@@ -278,18 +323,75 @@ export function ContentDialog({
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="youtube" className="space-y-2 mt-3">
-                    <Label htmlFor="video_url_youtube">YouTube havolasi</Label>
-                    <Input
-                      id="video_url_youtube"
-                      type="url"
-                      value={formData.video_url || ''}
-                      onChange={(e) => updateField('video_url', e.target.value)}
-                      placeholder="https://youtube.com/watch?v=... yoki youtu.be/..."
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Ochiq yoki yashirin (unlisted) YouTube video havolasini kiriting
-                    </p>
+                  <TabsContent value="youtube" className="space-y-3 mt-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="video_url_youtube">YouTube havolasi</Label>
+                      <Input
+                        id="video_url_youtube"
+                        type="url"
+                        value={formData.video_url || ''}
+                        onChange={(e) => handleYouTubeUrlChange(e.target.value)}
+                        placeholder="https://youtube.com/watch?v=... yoki youtu.be/..."
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Ochiq yoki yashirin (unlisted) YouTube video havolasini kiriting. Thumbnail avtomatik olinadi.
+                      </p>
+                    </div>
+                    
+                    {/* YouTube Thumbnail Preview */}
+                    {formData.video_type === 'youtube' && formData.video_url && (
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4" />
+                          Thumbnail
+                          {isFetchingThumbnail && (
+                            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                          )}
+                        </Label>
+                        {formData.thumbnail_url ? (
+                          <div className="relative inline-block">
+                            <img 
+                              src={formData.thumbnail_url} 
+                              alt="Video thumbnail"
+                              className="w-40 h-auto rounded-md border"
+                            />
+                            <div className="absolute top-1 right-1 flex gap-1">
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={clearThumbnail}
+                                title="O'chirish"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            <div className="absolute bottom-1 left-1">
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-green-500/90 text-white px-1.5 py-0.5 rounded">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Avtomatik
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchYouTubeThumbnail(formData.video_url)}
+                            disabled={isFetchingThumbnail}
+                          >
+                            {isFetchingThumbnail ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <ImageIcon className="w-4 h-4 mr-2" />
+                            )}
+                            Thumbnail olish
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="telegram" className="space-y-2 mt-3">
@@ -303,6 +405,9 @@ export function ContentDialog({
                     />
                     <p className="text-xs text-muted-foreground">
                       Telegram kanal yoki guruhdan video havolasini kiriting. Video ochiq bo'lishi kerak.
+                    </p>
+                    <p className="text-xs text-amber-600">
+                      ⚠️ Telegram videolar uchun thumbnail avtomatik olinmaydi.
                     </p>
                   </TabsContent>
 
@@ -339,6 +444,33 @@ export function ContentDialog({
                   </TabsContent>
                 </Tabs>
               </div>
+
+              {/* Thumbnail Preview for non-YouTube videos */}
+              {type === 'lesson' && formData.thumbnail_url && formData.video_type !== 'youtube' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4" />
+                    Thumbnail
+                  </Label>
+                  <div className="relative inline-block">
+                    <img 
+                      src={formData.thumbnail_url} 
+                      alt="Video thumbnail"
+                      className="w-40 h-auto rounded-md border"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={clearThumbnail}
+                      title="O'chirish"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="duration_minutes" className="flex items-center gap-2">
