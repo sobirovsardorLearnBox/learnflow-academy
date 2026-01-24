@@ -146,6 +146,11 @@ const CACHE_CONFIG = {
   user_groups: 120,       // 2 minutes
   group_members: 120,     // 2 minutes
   quiz_questions: 300,    // 5 minutes
+  // Batch progress endpoints
+  section_progress: 45,   // 45 seconds
+  level_progress: 45,     // 45 seconds
+  unit_progress: 45,      // 45 seconds
+  user_courses: 120,      // 2 minutes
 } as const
 
 // Request logging
@@ -979,6 +984,171 @@ Deno.serve(async (req) => {
       
       logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime })
       return successResponse(data)
+    }
+    
+    // ==================== BATCH SECTION PROGRESS ENDPOINT ====================
+    if (path === '/sections-progress' && method === 'POST') {
+      if (!userId) {
+        return errorResponse(401, 'Authentication required')
+      }
+      
+      const body = await req.json()
+      const sectionIds = body.section_ids as string[]
+      
+      if (!Array.isArray(sectionIds) || sectionIds.length === 0) {
+        return errorResponse(400, 'section_ids array is required')
+      }
+      
+      // Validate all UUIDs
+      if (!sectionIds.every(validateUUID)) {
+        return errorResponse(400, 'Invalid section_id format')
+      }
+      
+      const cacheKey = userCacheKey('section_progress_batch', userId, sectionIds.sort().join(','))
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      const { data, error } = await supabaseClient.rpc('get_section_progress_batch', {
+        p_user_id: userId,
+        p_section_ids: sectionIds
+      })
+      
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.section_progress)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== BATCH LEVEL PROGRESS ENDPOINT ====================
+    if (path === '/levels-progress' && method === 'POST') {
+      if (!userId) {
+        return errorResponse(401, 'Authentication required')
+      }
+      
+      const body = await req.json()
+      const levelIds = body.level_ids as string[]
+      
+      if (!Array.isArray(levelIds) || levelIds.length === 0) {
+        return errorResponse(400, 'level_ids array is required')
+      }
+      
+      if (!levelIds.every(validateUUID)) {
+        return errorResponse(400, 'Invalid level_id format')
+      }
+      
+      const cacheKey = userCacheKey('level_progress_batch', userId, levelIds.sort().join(','))
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      const { data, error } = await supabaseClient.rpc('get_level_progress_batch', {
+        p_user_id: userId,
+        p_level_ids: levelIds
+      })
+      
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.level_progress)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== BATCH UNIT PROGRESS ENDPOINT ====================
+    if (path === '/units-progress' && method === 'POST') {
+      if (!userId) {
+        return errorResponse(401, 'Authentication required')
+      }
+      
+      const body = await req.json()
+      const unitIds = body.unit_ids as string[]
+      
+      if (!Array.isArray(unitIds) || unitIds.length === 0) {
+        return errorResponse(400, 'unit_ids array is required')
+      }
+      
+      if (!unitIds.every(validateUUID)) {
+        return errorResponse(400, 'Invalid unit_id format')
+      }
+      
+      const cacheKey = userCacheKey('unit_progress_batch', userId, unitIds.sort().join(','))
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      const { data, error } = await supabaseClient.rpc('get_unit_progress_batch', {
+        p_user_id: userId,
+        p_unit_ids: unitIds
+      })
+      
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.unit_progress)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
+    }
+    
+    // ==================== USER COURSES OPTIMIZED ENDPOINT ====================
+    if (path === '/user-courses' && method === 'GET') {
+      if (!userId) {
+        return errorResponse(401, 'Authentication required')
+      }
+      
+      const cacheKey = userCacheKey('user_courses', userId)
+      const cachedResult = await getCached<unknown>(cacheKey)
+      
+      if (cachedResult.data !== null) {
+        logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cached: true, cacheType: cachedResult.source || undefined, cacheKey })
+        return new Response(
+          JSON.stringify({ success: true, data: cachedResult.data, cached: true, timestamp: new Date().toISOString() }),
+          { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } }
+        )
+      }
+      
+      const { data, error } = await supabaseClient.rpc('get_user_courses_optimized', {
+        p_user_id: userId
+      })
+      
+      if (error) throw error
+      
+      await setCache(cacheKey, data, CACHE_CONFIG.user_courses)
+      
+      logRequest({ ...requestLog, status: 200, duration: Date.now() - startTime, cacheKey })
+      return new Response(
+        JSON.stringify({ success: true, data, cached: false, timestamp: new Date().toISOString() }),
+        { status: 200, headers: { ...corsHeaders, ...rateLimitHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } }
+      )
     }
     
     // ==================== NOT FOUND ====================

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Code, BookOpen, Languages, Shield, Loader2, Users } from 'lucide-react';
@@ -13,10 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLevels, useUnits, Section, Level } from '@/hooks/useSections';
-import { useUnitProgress } from '@/hooks/useLessons';
-import { useUserAccessibleUnits } from '@/hooks/useGroupSections';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useUserAccessibleUnits, useGroupSectionsWithDetails } from '@/hooks/useGroupSections';
+import { useSectionProgressBatch, useLevelProgressBatch, useUnitProgressBatch, useUserCoursesOptimized } from '@/hooks/useBatchProgress';
 import { useConfetti } from '@/hooks/useConfetti';
 import { toast } from 'sonner';
 
@@ -30,11 +28,13 @@ const iconMap: Record<string, any> = {
 type View = 'groups' | 'sections' | 'levels' | 'units';
 
 interface UserGroup {
-  id: string;
-  name: string;
-  description: string | null;
+  group_id: string;
+  group_name: string;
+  group_description: string | null;
+  teacher_id: string;
   teacher_name: string;
   sections_count: number;
+  total_progress: number;
 }
 
 export default function MyCourses() {
@@ -53,234 +53,57 @@ export default function MyCourses() {
     type: "section" | "level" | "unit";
   }>({ open: false, title: '', description: '', type: 'unit' });
 
-  // Fetch user's groups with assigned sections
-  const { data: userGroups, isLoading: groupsLoading } = useQuery({
-    queryKey: ['my-groups', user?.user_id],
-    queryFn: async () => {
-      if (!user?.user_id) return [];
-      
-      // Get groups where user is an approved member
-      const { data: memberships, error: membershipError } = await supabase
-        .from('group_members')
-        .select(`
-          group_id,
-          groups (
-            id,
-            name,
-            description,
-            teacher_id
-          )
-        `)
-        .eq('user_id', user.user_id)
-        .eq('is_approved', true);
-      
-      if (membershipError) throw membershipError;
-      
-      const groupsWithDetails = await Promise.all(
-        (memberships || []).map(async (m) => {
-          const group = m.groups as any;
-          if (!group) return null;
-          
-          // Get teacher name
-          const { data: teacherProfile } = await supabase
-            .from('profiles')
-            .select('name')
-            .eq('user_id', group.teacher_id)
-            .single();
-          
-          // Get sections count for this group
-          const { count } = await supabase
-            .from('group_sections')
-            .select('*', { count: 'exact', head: true })
-            .eq('group_id', group.id);
-          
-          return {
-            id: group.id,
-            name: group.name,
-            description: group.description,
-            teacher_name: teacherProfile?.name || 'Ustoz',
-            sections_count: count || 0,
-          } as UserGroup;
-        })
-      );
-      
-      return groupsWithDetails.filter(Boolean) as UserGroup[];
-    },
-    enabled: !!user?.user_id,
-  });
+  // OPTIMIZED: Single RPC call for user groups
+  const { data: userGroups, isLoading: groupsLoading } = useUserCoursesOptimized(user?.user_id);
 
-  // Fetch sections for selected group with progress
-  const { data: groupSections, isLoading: sectionsLoading } = useQuery({
-    queryKey: ['group-sections-full', selectedGroup?.id, user?.user_id],
-    queryFn: async () => {
-      if (!selectedGroup?.id || !user?.user_id) return [];
-      
-      const { data: gs, error } = await supabase
-        .from('group_sections')
-        .select('section_id')
-        .eq('group_id', selectedGroup.id);
-      
-      if (error) throw error;
-      
-      if (!gs || gs.length === 0) return [];
-      
-      const sectionIds = gs.map(s => s.section_id);
-      
-      const { data: sections, error: sectionsError } = await supabase
-        .from('sections')
-        .select('*')
-        .in('id', sectionIds)
-        .eq('is_active', true)
-        .order('display_order');
-      
-      if (sectionsError) throw sectionsError;
-      
-      // Calculate progress for each section
-      const sectionsWithProgress = await Promise.all(
-        (sections || []).map(async (section) => {
-          // Get all levels in this section
-          const { data: levelsData } = await supabase
-            .from('levels')
-            .select('id')
-            .eq('section_id', section.id)
-            .eq('is_active', true);
-          
-          if (!levelsData || levelsData.length === 0) {
-            return { ...section, progress: 0, totalLessons: 0, completedLessons: 0, levelsCount: 0 };
-          }
-          
-          const levelIds = levelsData.map(l => l.id);
-          
-          // Get all units in these levels
-          const { data: unitsData } = await supabase
-            .from('units')
-            .select('id')
-            .in('level_id', levelIds)
-            .eq('is_active', true);
-          
-          if (!unitsData || unitsData.length === 0) {
-            return { ...section, progress: 0, totalLessons: 0, completedLessons: 0, levelsCount: levelsData.length };
-          }
-          
-          const unitIds = unitsData.map(u => u.id);
-          
-          // Get all lessons in these units
-          const { data: lessonsData } = await supabase
-            .from('lessons')
-            .select('id')
-            .in('unit_id', unitIds)
-            .eq('is_active', true);
-          
-          const totalLessons = lessonsData?.length || 0;
-          
-          if (totalLessons === 0) {
-            return { ...section, progress: 0, totalLessons: 0, completedLessons: 0, levelsCount: levelsData.length };
-          }
-          
-          const lessonIds = lessonsData!.map(l => l.id);
-          
-          // Get completed lessons for this user
-          const { data: progressData } = await supabase
-            .from('lesson_progress')
-            .select('id')
-            .eq('user_id', user.user_id)
-            .eq('completed', true)
-            .in('lesson_id', lessonIds);
-          
-          const completedLessons = progressData?.length || 0;
-          const progress = Math.round((completedLessons / totalLessons) * 100);
-          
-          return { 
-            ...section, 
-            progress, 
-            totalLessons, 
-            completedLessons, 
-            levelsCount: levelsData.length 
-          };
-        })
-      );
-      
-      return sectionsWithProgress;
-    },
-    enabled: !!selectedGroup?.id && !!user?.user_id,
-  });
+  // OPTIMIZED: Get sections for selected group with JOIN
+  const { data: groupSections, isLoading: sectionsLoading } = useGroupSectionsWithDetails(selectedGroup?.group_id);
 
+  // Extract section IDs for batch progress query
+  const sectionIds = useMemo(() => 
+    (groupSections || []).map(s => s.id), 
+    [groupSections]
+  );
+
+  // OPTIMIZED: Single RPC call for all section progress
+  const { data: sectionProgressMap } = useSectionProgressBatch(sectionIds, user?.user_id);
+
+  // Get levels for selected section
   const { data: levels, isLoading: levelsLoading } = useLevels(selectedSection?.id);
+
+  // Extract level IDs for batch progress query
+  const levelIds = useMemo(() => 
+    (levels || []).map(l => l.id), 
+    [levels]
+  );
+
+  // OPTIMIZED: Single RPC call for all level progress
+  const { data: levelProgressMap } = useLevelProgressBatch(levelIds, user?.user_id);
+
+  // Get units for selected level
   const { data: units, isLoading: unitsLoading } = useUnits(selectedLevel?.id);
   const { data: accessibleUnitIds } = useUserAccessibleUnits(user?.user_id);
-  
-  const unitIds = useMemo(() => (units || []).map(u => u.id), [units]);
-  const { data: unitProgress } = useUnitProgress(unitIds, user?.user_id);
 
-  // Fetch level progress for all levels in selected section
-  const { data: levelProgressData } = useQuery({
-    queryKey: ['level-progress', selectedSection?.id, user?.user_id],
-    queryFn: async () => {
-      if (!selectedSection?.id || !user?.user_id || !levels) return {};
-      
-      const progressMap: Record<string, { progress: number; totalLessons: number; completedLessons: number; unitsCount: number }> = {};
-      
-      for (const level of levels) {
-        // Get all units in this level
-        const { data: unitsData } = await supabase
-          .from('units')
-          .select('id')
-          .eq('level_id', level.id)
-          .eq('is_active', true);
-        
-        if (!unitsData || unitsData.length === 0) {
-          progressMap[level.id] = { progress: 0, totalLessons: 0, completedLessons: 0, unitsCount: 0 };
-          continue;
-        }
-        
-        const unitIds = unitsData.map(u => u.id);
-        
-        // Get all lessons in these units
-        const { data: lessonsData } = await supabase
-          .from('lessons')
-          .select('id')
-          .in('unit_id', unitIds)
-          .eq('is_active', true);
-        
-        const totalLessons = lessonsData?.length || 0;
-        
-        if (totalLessons === 0) {
-          progressMap[level.id] = { progress: 0, totalLessons: 0, completedLessons: 0, unitsCount: unitsData.length };
-          continue;
-        }
-        
-        const lessonIds = lessonsData!.map(l => l.id);
-        
-        // Get completed lessons for this user
-        const { data: progressData } = await supabase
-          .from('lesson_progress')
-          .select('id')
-          .eq('user_id', user.user_id)
-          .eq('completed', true)
-          .in('lesson_id', lessonIds);
-        
-        const completedLessons = progressData?.length || 0;
-        const progress = Math.round((completedLessons / totalLessons) * 100);
-        
-        progressMap[level.id] = { progress, totalLessons, completedLessons, unitsCount: unitsData.length };
-      }
-      
-      return progressMap;
-    },
-    enabled: !!selectedSection?.id && !!user?.user_id && !!levels && levels.length > 0,
-  });
+  // Extract unit IDs for batch progress query
+  const unitIds = useMemo(() => 
+    (units || []).map(u => u.id), 
+    [units]
+  );
+
+  // OPTIMIZED: Single RPC call for all unit progress
+  const { data: unitProgressMap } = useUnitProgressBatch(unitIds, user?.user_id);
 
   if (!user) {
     navigate('/');
     return null;
   }
 
-  const handleGroupClick = (group: UserGroup) => {
+  const handleGroupClick = useCallback((group: UserGroup) => {
     setSelectedGroup(group);
     setView('sections');
-  };
+  }, []);
 
-  const handleSectionClick = (section: any, isLocked?: boolean, isLockedByProgress?: boolean) => {
+  const handleSectionClick = useCallback((section: any, isLocked?: boolean, isLockedByProgress?: boolean) => {
     if (isLocked) {
       if (isLockedByProgress) {
         toast.error("Oldingi bo'limni kamida 80% bajaring");
@@ -289,9 +112,9 @@ export default function MyCourses() {
     }
     setSelectedSection(section);
     setView('levels');
-  };
+  }, []);
 
-  const handleLevelClick = (level: Level, isLocked: boolean, isLockedByProgress?: boolean) => {
+  const handleLevelClick = useCallback((level: Level, isLocked: boolean, isLockedByProgress?: boolean) => {
     if (isLocked) {
       if (isLockedByProgress) {
         toast.error("Oldingi levelni kamida 80% bajaring");
@@ -300,9 +123,9 @@ export default function MyCourses() {
     }
     setSelectedLevel(level);
     setView('units');
-  };
+  }, []);
 
-  const handleUnitClick = (unitId: string, isLocked: boolean, isLockedByProgress?: boolean) => {
+  const handleUnitClick = useCallback((unitId: string, isLocked: boolean, isLockedByProgress?: boolean) => {
     if (isLocked) {
       if (isLockedByProgress) {
         toast.error("Oldingi unitni kamida 80% bajaring");
@@ -312,9 +135,9 @@ export default function MyCourses() {
       return;
     }
     navigate(`/lesson/${unitId}`);
-  };
+  }, [navigate]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (view === 'units') {
       setView('levels');
       setSelectedLevel(null);
@@ -325,31 +148,28 @@ export default function MyCourses() {
       setView('groups');
       setSelectedGroup(null);
     }
-  };
+  }, [view]);
 
-  // Calculate section lock status based on previous section progress (80% threshold)
+  // Transform sections with progress from batch query
   const transformedSections = useMemo(() => {
-    const sortedSections = [...(groupSections || [])].sort((a: any, b: any) => 
+    const sortedSections = [...(groupSections || [])].sort((a, b) => 
       (a.display_order || 0) - (b.display_order || 0)
     );
     
-    return sortedSections.map((section: any, index: number) => {
-      const progressPercent = section.progress || 0;
+    return sortedSections.map((section, index) => {
+      const progress = sectionProgressMap?.[section.id];
+      const progressPercent = progress?.progress_percent || 0;
       
-      // First section is always unlocked
       let isLockedByProgress = false;
       let prevProgressPercent = 0;
       
       if (index > 0) {
-        // Check previous section's progress
         const prevSection = sortedSections[index - 1];
-        prevProgressPercent = prevSection.progress || 0;
-        
-        // Lock if previous section is less than 80% complete
+        const prevProgress = sectionProgressMap?.[prevSection.id];
+        prevProgressPercent = prevProgress?.progress_percent || 0;
         isLockedByProgress = prevProgressPercent < 80;
       }
       
-      // Calculate remaining progress needed to unlock (80% - current progress of previous section)
       const unlockProgressNeeded = isLockedByProgress ? 80 - prevProgressPercent : 0;
       
       return {
@@ -359,39 +179,34 @@ export default function MyCourses() {
         icon: iconMap[section.icon || 'Code'] || Code,
         color: 'from-primary to-accent',
         progress: progressPercent,
-        levelsCount: section.levelsCount || 0,
+        levelsCount: progress?.levels_count || 0,
         isLocked: isLockedByProgress,
         isLockedByProgress,
         unlockProgressNeeded,
-        totalLessons: section.totalLessons || 0,
-        completedLessons: section.completedLessons || 0,
+        totalLessons: Number(progress?.total_lessons || 0),
+        completedLessons: Number(progress?.completed_lessons || 0),
       };
     });
-  }, [groupSections]);
+  }, [groupSections, sectionProgressMap]);
 
-  // Calculate level lock status based on previous level progress (80% threshold)
+  // Transform levels with progress from batch query
   const transformedLevels = useMemo(() => {
     const sortedLevels = [...(levels || [])].sort((a, b) => a.level_number - b.level_number);
     
     return sortedLevels.map((level, index) => {
-      const levelProgress = levelProgressData?.[level.id];
-      const progressPercent = levelProgress?.progress || 0;
+      const progress = levelProgressMap?.[level.id];
+      const progressPercent = progress?.progress_percent || 0;
       
-      // First level is always unlocked
       let isLockedByProgress = false;
       let prevProgressPercent = 0;
       
       if (index > 0) {
-        // Check previous level's progress
         const prevLevel = sortedLevels[index - 1];
-        const prevLevelProgress = levelProgressData?.[prevLevel.id];
-        prevProgressPercent = prevLevelProgress?.progress || 0;
-        
-        // Lock if previous level is less than 80% complete
+        const prevProgress = levelProgressMap?.[prevLevel.id];
+        prevProgressPercent = prevProgress?.progress_percent || 0;
         isLockedByProgress = prevProgressPercent < 80;
       }
       
-      // Calculate remaining progress needed to unlock (80% - current progress of previous level)
       const unlockProgressNeeded = isLockedByProgress ? 80 - prevProgressPercent : 0;
       
       return {
@@ -403,44 +218,38 @@ export default function MyCourses() {
         isLocked: isLockedByProgress,
         isLockedByProgress,
         unlockProgressNeeded,
-        unitsCount: levelProgress?.unitsCount || 0,
-        totalLessons: levelProgress?.totalLessons || 0,
-        completedLessons: levelProgress?.completedLessons || 0,
+        unitsCount: progress?.units_count || 0,
+        totalLessons: Number(progress?.total_lessons || 0),
+        completedLessons: Number(progress?.completed_lessons || 0),
       };
     });
-  }, [levels, levelProgressData]);
+  }, [levels, levelProgressMap]);
 
-  // Calculate unit lock status based on previous unit progress (80% threshold)
+  // Transform units with progress from batch query
   const transformedUnits = useMemo(() => {
     const sortedUnits = [...(units || [])].sort((a, b) => Number(a.unit_number) - Number(b.unit_number));
     
     return sortedUnits.map((unit, index) => {
-      const progress = unitProgress?.[unit.id];
-      const progressPercent = progress ? Math.round((progress.completed / progress.total) * 100) : 0;
-      const isCompleted = progress ? progress.completed === progress.total && progress.total > 0 : false;
+      const progress = unitProgressMap?.[unit.id];
+      const progressPercent = progress?.progress_percent || 0;
+      const isCompleted = progress?.is_completed || false;
       const hasAccess = (accessibleUnitIds || []).includes(unit.id);
       
-      // First unit is always unlocked (if user has access)
       let isLockedByProgress = false;
       let prevProgressPercent = 0;
       
       if (index > 0) {
-        // Check previous unit's progress
         const prevUnit = sortedUnits[index - 1];
-        const prevProgress = unitProgress?.[prevUnit.id];
-        prevProgressPercent = prevProgress 
-          ? Math.round((prevProgress.completed / prevProgress.total) * 100) 
-          : 0;
-        
-        // Lock if previous unit is less than 80% complete
+        const prevProgress = unitProgressMap?.[prevUnit.id];
+        prevProgressPercent = prevProgress?.progress_percent || 0;
         isLockedByProgress = prevProgressPercent < 80;
       }
       
-      // First unit is always unlocked
       const isFirstUnit = index === 0;
-      
-      // Calculate remaining progress needed to unlock (80% - current progress of previous unit)
       const unlockProgressNeeded = isLockedByProgress && !isFirstUnit ? 80 - prevProgressPercent : 0;
+      
+      const totalLessons = Number(progress?.total_lessons || 0);
+      const completedLessons = Number(progress?.completed_lessons || 0);
       
       return {
         id: unit.id,
@@ -451,19 +260,18 @@ export default function MyCourses() {
         isLocked: isFirstUnit ? false : (!hasAccess || isLockedByProgress),
         isLockedByProgress: isFirstUnit ? false : isLockedByProgress,
         unlockProgressNeeded,
-        subUnits: progress ? [`${progress.completed}/${progress.total} dars`] : ['Darslar yo\'q'],
+        subUnits: totalLessons > 0 ? [`${completedLessons}/${totalLessons} dars`] : ['Darslar yo\'q'],
         progress: progressPercent,
-        totalLessons: progress?.total || 0,
-        completedLessons: progress?.completed || 0,
-        averageScore: progress?.averageScore || 0,
-        passedCount: progress?.passedCount || 0,
+        totalLessons,
+        completedLessons,
+        averageScore: progress?.average_score || 0,
+        passedCount: completedLessons,
       };
     });
-  }, [units, unitProgress, accessibleUnitIds]);
+  }, [units, unitProgressMap, accessibleUnitIds]);
 
-  // Trigger confetti when a section, level, or unit reaches 100%
+  // Achievement confetti effects
   useEffect(() => {
-    // Check sections for 100% completion
     transformedSections.forEach((section) => {
       if (section.progress === 100 && !confettiTriggeredFor.current.has(`section-${section.id}`)) {
         confettiTriggeredFor.current.add(`section-${section.id}`);
@@ -479,7 +287,6 @@ export default function MyCourses() {
   }, [transformedSections, triggerSuccessConfetti]);
 
   useEffect(() => {
-    // Check levels for 100% completion
     transformedLevels.forEach((level) => {
       if (level.progress === 100 && !confettiTriggeredFor.current.has(`level-${level.id}`)) {
         confettiTriggeredFor.current.add(`level-${level.id}`);
@@ -495,7 +302,6 @@ export default function MyCourses() {
   }, [transformedLevels, triggerSuccessConfetti]);
 
   useEffect(() => {
-    // Check units for 100% completion
     transformedUnits.forEach((unit) => {
       if (unit.progress === 100 && !confettiTriggeredFor.current.has(`unit-${unit.id}`)) {
         confettiTriggeredFor.current.add(`unit-${unit.id}`);
@@ -531,7 +337,7 @@ export default function MyCourses() {
               className="text-2xl lg:text-3xl font-bold"
             >
               {view === 'groups' && 'Mening Kurslarim'}
-              {view === 'sections' && selectedGroup?.name}
+              {view === 'sections' && selectedGroup?.group_name}
               {view === 'levels' && selectedSection?.name}
               {view === 'units' && selectedLevel?.name}
             </motion.h1>
@@ -561,7 +367,7 @@ export default function MyCourses() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {userGroups.map((group, index) => (
               <motion.div
-                key={group.id}
+                key={group.group_id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
@@ -580,9 +386,9 @@ export default function MyCourses() {
                         {group.sections_count} bo'lim
                       </Badge>
                     </div>
-                    <CardTitle className="mt-4">{group.name}</CardTitle>
+                    <CardTitle className="mt-4">{group.group_name}</CardTitle>
                     <CardDescription>
-                      {group.description || "Guruh ta'rifi yo'q"}
+                      {group.group_description || "Guruh ta'rifi yo'q"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

@@ -12,6 +12,10 @@ export const QUERY_STALE_TIMES = {
   unitProgress: 30 * 1000,
   userStats: 60 * 1000, // 1 minute
   
+  // Batch progress (optimized queries)
+  sectionProgress: 45 * 1000, // 45 seconds
+  levelProgress: 45 * 1000,
+  
   // Real-time sensitive
   notifications: 10 * 1000, // 10 seconds
   leaderboard: 30 * 1000, // 30 seconds
@@ -20,12 +24,16 @@ export const QUERY_STALE_TIMES = {
   dashboardStats: 60 * 1000, // 1 minute
   attendance: 60 * 1000,
   payments: 60 * 1000,
+  
+  // Courses
+  userCourses: 2 * 60 * 1000, // 2 minutes
 } as const;
 
 export const QUERY_GC_TIMES = {
   default: 5 * 60 * 1000, // 5 minutes
   userSpecific: 2 * 60 * 1000, // 2 minutes
   realtime: 60 * 1000, // 1 minute
+  longLived: 10 * 60 * 1000, // 10 minutes for static content
 } as const;
 
 // Query key factory for consistent cache invalidation
@@ -40,13 +48,25 @@ export const queryKeys = {
   lesson: (lessonId?: string) => ['lesson', lessonId] as const,
   quizzes: (lessonId?: string) => ['quizzes', lessonId] as const,
   
-  // Progress
+  // Progress - standard
   lessonProgress: (userId?: string) => ['lesson_progress', userId] as const,
   unitProgress: (unitIds: string[], userId?: string) => ['unit_progress', unitIds, userId] as const,
   userProgress: (userId?: string) => ['user_progress', userId] as const,
   userStats: (userId?: string) => ['user_stats', userId] as const,
   lessonScores: (userId?: string) => ['lesson_scores', userId] as const,
   averageScore: (userId?: string) => ['average_score', userId] as const,
+  
+  // Progress - batch optimized
+  sectionProgressBatch: (sectionIds: string[], userId?: string) => 
+    ['section-progress-batch', sectionIds, userId] as const,
+  levelProgressBatch: (levelIds: string[], userId?: string) => 
+    ['level-progress-batch', levelIds, userId] as const,
+  unitProgressBatch: (unitIds: string[], userId?: string) => 
+    ['unit-progress-batch', unitIds, userId] as const,
+  
+  // User courses
+  userCourses: (userId?: string) => ['user-courses-optimized', userId] as const,
+  groupSectionsDetails: (groupId?: string) => ['group-sections-details', groupId] as const,
   
   // Leaderboard
   leaderboard: (groupId?: string, limit?: number, offset?: number) => 
@@ -58,6 +78,7 @@ export const queryKeys = {
   userGroups: (userId?: string) => ['user_groups', userId] as const,
   groups: () => ['groups'] as const,
   groupMembers: (groupId?: string) => ['group_members', groupId] as const,
+  groupSections: (groupId?: string) => ['group-sections', groupId] as const,
   
   // Notifications
   notifications: (userId?: string) => ['notifications', userId] as const,
@@ -76,6 +97,10 @@ export const queryKeys = {
     ['user_stats', userId],
     ['lesson_scores', userId],
     ['notifications', userId],
+    ['section-progress-batch'],
+    ['level-progress-batch'],
+    ['unit-progress-batch'],
+    ['user-courses-optimized', userId],
   ] as const,
 } as const;
 
@@ -87,6 +112,9 @@ export const invalidationGroups = {
     queryKeys.userStats(userId),
     queryKeys.lessonScores(userId),
     queryKeys.averageScore(userId),
+    ['section-progress-batch'],
+    ['level-progress-batch'],
+    ['unit-progress-batch'],
   ],
   
   // When a unit is completed
@@ -106,5 +134,9 @@ export const invalidationGroups = {
     'lesson_scores',
     'notifications',
     'user_groups',
+    'section-progress-batch',
+    'level-progress-batch',
+    'unit-progress-batch',
+    'user-courses-optimized',
   ],
 } as const;

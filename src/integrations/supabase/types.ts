@@ -775,6 +775,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_level_progress_batch: {
+        Args: { p_level_ids: string[]; p_user_id: string }
+        Returns: {
+          completed_lessons: number
+          level_id: string
+          progress_percent: number
+          total_lessons: number
+          units_count: number
+        }[]
+      }
       get_quiz_questions: {
         Args: { p_lesson_id: string }
         Returns: {
@@ -788,6 +798,16 @@ export type Database = {
           question: string
           question_order: number
           updated_at: string
+        }[]
+      }
+      get_section_progress_batch: {
+        Args: { p_section_ids: string[]; p_user_id: string }
+        Returns: {
+          completed_lessons: number
+          levels_count: number
+          progress_percent: number
+          section_id: string
+          total_lessons: number
         }[]
       }
       get_student_leaderboard: {
@@ -811,6 +831,29 @@ export type Database = {
           name: string
           rank: number
           user_id: string
+        }[]
+      }
+      get_unit_progress_batch: {
+        Args: { p_unit_ids: string[]; p_user_id: string }
+        Returns: {
+          average_score: number
+          completed_lessons: number
+          is_completed: boolean
+          progress_percent: number
+          total_lessons: number
+          unit_id: string
+        }[]
+      }
+      get_user_courses_optimized: {
+        Args: { p_user_id: string }
+        Returns: {
+          group_description: string
+          group_id: string
+          group_name: string
+          sections_count: number
+          teacher_id: string
+          teacher_name: string
+          total_progress: number
         }[]
       }
       get_user_payment_status: {
